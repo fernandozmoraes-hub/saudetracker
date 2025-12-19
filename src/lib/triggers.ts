@@ -68,6 +68,10 @@ export function evaluateTriggers(data: AnalysisData): TriggerResult {
   // 🟡 ATENÇÃO
   const attentionReasons: string[] = [];
   
+  // Sono < 6h em um único dia = Atenção (2+ dias já é Risk acima)
+  if (sleepHours < 6 && consecutiveLowSleepDays < 2) {
+    attentionReasons.push('Sono abaixo de 6h');
+  }
   if (tsb >= -15 && tsb < -5) {
     attentionReasons.push('TSB entre -5 e -15');
   }
