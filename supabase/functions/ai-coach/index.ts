@@ -1,9 +1,60 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+
+// Input validation schemas
+const WorkoutSchema = z.object({
+  date: z.string().max(20),
+  type: z.string().max(50),
+  durationMin: z.number().min(0).max(1440),
+  rpe: z.number().min(1).max(10),
+  tssSubjective: z.number().min(0).max(500),
+});
+
+const TodayDataSchema = z.object({
+  hrv: z.number().min(0).max(300),
+  hrvStatus: z.string().max(20),
+  restingHr: z.number().min(20).max(250),
+  sleepHours: z.number().min(0).max(24),
+  sleepQuality: z.number().min(1).max(5),
+  bodyBattery: z.number().min(0).max(100).optional().nullable(),
+  mood: z.number().min(1).max(5).optional().nullable(),
+});
+
+const TrainingLoadSchema = z.object({
+  atl: z.number().min(0).max(500),
+  ctl: z.number().min(0).max(500),
+  tsb: z.number().min(-200).max(200),
+});
+
+const TrendsSchema = z.object({
+  hrvBaseline7d: z.number().min(0).max(300),
+  hrvVsBaseline: z.number().min(-100).max(100),
+  consecutiveCriticalDays: z.number().min(0).max(365),
+  consecutiveLowSleepDays: z.number().min(0).max(365),
+  atlTrend5d: z.string().max(20),
+});
+
+const AnalysisDataSchema = z.object({
+  today: TodayDataSchema,
+  trainingLoad: TrainingLoadSchema,
+  trends: TrendsSchema,
+  recentWorkouts: z.array(WorkoutSchema).max(30),
+});
+
+const TriggerResultSchema = z.object({
+  classification: z.enum(['safe', 'attention', 'risk', 'blocked']),
+  reasons: z.array(z.string().max(100)).max(20),
+});
+
+const RequestBodySchema = z.object({
+  analysisData: AnalysisDataSchema,
+  triggerResult: TriggerResultSchema,
+});
 
 const SYSTEM_PROMPT = `Você é um treinador experiente em atletas master (50+), especializado em saúde, longevidade e progressão sustentável.
 
