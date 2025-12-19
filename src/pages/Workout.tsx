@@ -10,7 +10,7 @@ import { saveWorkout, getWorkoutsByDate } from '@/lib/storage';
 import { calculateTssSubjective, getHRVMetrics } from '@/lib/calculations';
 import { Workout as WorkoutType, WorkoutType as WorkoutTypeEnum } from '@/types/health';
 import { useToast } from '@/hooks/use-toast';
-import { Dumbbell, Bike, Timer, Activity, Check } from 'lucide-react';
+import { Dumbbell, Bike, Timer, Activity, Check, MapPin, Heart } from 'lucide-react';
 
 const workoutTypes: { type: WorkoutTypeEnum; label: string; icon: React.ReactNode }[] = [
   { type: 'Run', label: 'Corrida', icon: <Activity className="w-5 h-5" /> },
@@ -27,6 +27,8 @@ export default function Workout() {
   const [duration, setDuration] = useState<number | undefined>();
   const [rpe, setRpe] = useState<number>(5);
   const [validated, setValidated] = useState(false);
+  const [distance, setDistance] = useState<number | undefined>();
+  const [avgHr, setAvgHr] = useState<number | undefined>();
   
   const tssSubjective = duration && rpe ? calculateTssSubjective(duration, rpe) : 0;
   const hrvMetrics = getHRVMetrics(today);
@@ -61,6 +63,8 @@ export default function Workout() {
       rpe: selectedType === 'Rest' ? 0 : rpe,
       tssSubjective: selectedType === 'Rest' ? 0 : tssSubjective,
       validated: selectedType === 'Strength' ? validated : true,
+      distanceKm: (selectedType === 'Run' || selectedType === 'Bike') ? distance : undefined,
+      avgHr: (selectedType === 'Run' || selectedType === 'Bike') ? avgHr : undefined,
     };
     
     saveWorkout(workout);
@@ -75,6 +79,8 @@ export default function Workout() {
     setDuration(undefined);
     setRpe(5);
     setValidated(false);
+    setDistance(undefined);
+    setAvgHr(undefined);
   };
   
   const todayWorkouts = getWorkoutsByDate(today);
@@ -92,7 +98,10 @@ export default function Workout() {
               <div key={w.id} className="flex items-center justify-between text-sm">
                 <span className="font-medium">{w.type}</span>
                 <span className="text-muted-foreground">
-                  {w.durationMin}min • RPE {w.rpe} • TSS {w.tssSubjective}
+                  {w.durationMin}min
+                  {(w.type === 'Run' || w.type === 'Bike') && w.distanceKm && ` • ${w.distanceKm}km`}
+                  {(w.type === 'Run' || w.type === 'Bike') && w.avgHr && ` • FC ${w.avgHr}`}
+                  {' '}• RPE {w.rpe} • TSS {w.tssSubjective}
                 </span>
               </div>
             ))}
@@ -138,6 +147,40 @@ export default function Workout() {
                 className="text-lg"
               />
             </div>
+            
+            {(selectedType === 'Run' || selectedType === 'Bike') && (
+              <div className="grid grid-cols-2 gap-4 animate-slide-up">
+                <div className="space-y-2">
+                  <Label htmlFor="distance" className="flex items-center gap-2">
+                    <MapPin className="w-4 h-4 text-primary" />
+                    Distância (km)
+                  </Label>
+                  <Input
+                    id="distance"
+                    type="number"
+                    step="0.1"
+                    placeholder="Ex: 10.5"
+                    value={distance || ''}
+                    onChange={(e) => setDistance(Number(e.target.value) || undefined)}
+                    className="text-lg"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="avgHr" className="flex items-center gap-2">
+                    <Heart className="w-4 h-4 text-primary" />
+                    FC Média (bpm)
+                  </Label>
+                  <Input
+                    id="avgHr"
+                    type="number"
+                    placeholder="Ex: 145"
+                    value={avgHr || ''}
+                    onChange={(e) => setAvgHr(Number(e.target.value) || undefined)}
+                    className="text-lg"
+                  />
+                </div>
+              </div>
+            )}
             
             <div className="space-y-3 animate-slide-up">
               <Label className="flex items-center justify-between">
