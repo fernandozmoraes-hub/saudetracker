@@ -9,6 +9,7 @@ import CheckIn from "./pages/CheckIn";
 import Workout from "./pages/Workout";
 import Week from "./pages/Week";
 import History from "./pages/History";
+import Install from "./pages/Install";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -26,6 +27,7 @@ const App = () => (
             <Route path="/workout" element={<Workout />} />
             <Route path="/week" element={<Week />} />
             <Route path="/history" element={<History />} />
+            <Route path="/install" element={<Install />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
           <BottomNav />
