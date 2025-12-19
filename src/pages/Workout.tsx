@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { saveWorkout, getWorkoutsByDate } from '@/lib/storage';
+import { useData } from '@/hooks/useData';
 import { calculateTssSubjective, getHRVMetrics } from '@/lib/calculations';
 import { Workout as WorkoutType, WorkoutType as WorkoutTypeEnum } from '@/types/health';
 import { useToast } from '@/hooks/use-toast';
@@ -22,6 +22,7 @@ const workoutTypes: { type: WorkoutTypeEnum; label: string; icon: React.ReactNod
 export default function Workout() {
   const today = format(new Date(), 'yyyy-MM-dd');
   const { toast } = useToast();
+  const { dailyChecks, workouts, saveWorkout } = useData();
   
   const [selectedType, setSelectedType] = useState<WorkoutTypeEnum | null>(null);
   const [duration, setDuration] = useState<number | undefined>();
@@ -31,10 +32,10 @@ export default function Workout() {
   const [avgHr, setAvgHr] = useState<number | undefined>();
   
   const tssSubjective = duration && rpe ? calculateTssSubjective(duration, rpe) : 0;
-  const hrvMetrics = getHRVMetrics(today);
+  const hrvMetrics = getHRVMetrics(today, dailyChecks);
   const tssEffective = Math.round(tssSubjective * (hrvMetrics?.factor ?? 1.0));
   
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!selectedType) {
@@ -67,23 +68,31 @@ export default function Workout() {
       avgHr: (selectedType === 'Run' || selectedType === 'Bike') ? avgHr : undefined,
     };
     
-    saveWorkout(workout);
+    const success = await saveWorkout(workout);
     
-    toast({
-      title: 'Treino registrado!',
-      description: `${selectedType === 'Rest' ? 'Dia de descanso' : `TSS efetivo: ${tssEffective}`}`,
-    });
-    
-    // Reset form
-    setSelectedType(null);
-    setDuration(undefined);
-    setRpe(5);
-    setValidated(false);
-    setDistance(undefined);
-    setAvgHr(undefined);
+    if (success) {
+      toast({
+        title: 'Treino registrado!',
+        description: `${selectedType === 'Rest' ? 'Dia de descanso' : `TSS efetivo: ${tssEffective}`}`,
+      });
+      
+      // Reset form
+      setSelectedType(null);
+      setDuration(undefined);
+      setRpe(5);
+      setValidated(false);
+      setDistance(undefined);
+      setAvgHr(undefined);
+    } else {
+      toast({
+        title: 'Erro ao salvar',
+        description: 'Não foi possível salvar o treino.',
+        variant: 'destructive',
+      });
+    }
   };
   
-  const todayWorkouts = getWorkoutsByDate(today);
+  const todayWorkouts = workouts.filter(w => w.date === today);
   
   return (
     <PageContainer 

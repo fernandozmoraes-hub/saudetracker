@@ -1,19 +1,17 @@
 import { DailyCheck, Workout, HRVStatus, HRVMetrics, TodayMetrics, WeeklyLoad } from '@/types/health';
-import { getDailyChecks, getWorkouts } from './storage';
-import { format, subDays, startOfWeek, endOfWeek, eachDayOfInterval, parseISO, getISOWeek, getYear } from 'date-fns';
+import { format, subDays, startOfWeek, endOfWeek, eachDayOfInterval, getISOWeek, getYear } from 'date-fns';
 
 export function calculateTssSubjective(durationMin: number, rpe: number): number {
   return Math.round((durationMin * rpe) / 10);
 }
 
-export function getHRVBaseline7d(date: string): number {
-  const checks = getDailyChecks();
+export function getHRVBaseline7d(date: string, dailyChecks: DailyCheck[]): number {
   const targetDate = new Date(date);
   const last7Days: number[] = [];
   
   for (let i = 1; i <= 7; i++) {
     const checkDate = format(subDays(targetDate, i), 'yyyy-MM-dd');
-    const check = checks.find(c => c.date === checkDate);
+    const check = dailyChecks.find(c => c.date === checkDate);
     if (check?.hrv) {
       last7Days.push(check.hrv);
     }
@@ -37,13 +35,12 @@ export function getHRVFactor(status: HRVStatus): number {
   }
 }
 
-export function getHRVMetrics(date: string): HRVMetrics | null {
-  const checks = getDailyChecks();
-  const check = checks.find(c => c.date === date);
+export function getHRVMetrics(date: string, dailyChecks: DailyCheck[]): HRVMetrics | null {
+  const check = dailyChecks.find(c => c.date === date);
   
   if (!check) return null;
   
-  const baseline = getHRVBaseline7d(date);
+  const baseline = getHRVBaseline7d(date, dailyChecks);
   const status = getHRVStatus(check.hrv, baseline);
   const factor = getHRVFactor(status);
   
@@ -55,23 +52,23 @@ export function getHRVMetrics(date: string): HRVMetrics | null {
   };
 }
 
-export function getDailyTssEffective(date: string): number {
-  const workouts = getWorkouts().filter(w => w.date === date);
-  const hrvMetrics = getHRVMetrics(date);
+export function getDailyTssEffective(date: string, dailyChecks: DailyCheck[], workouts: Workout[]): number {
+  const dateWorkouts = workouts.filter(w => w.date === date);
+  const hrvMetrics = getHRVMetrics(date, dailyChecks);
   const factor = hrvMetrics?.factor ?? 1.0;
   
-  const totalTss = workouts.reduce((sum, w) => sum + w.tssSubjective, 0);
+  const totalTss = dateWorkouts.reduce((sum, w) => sum + w.tssSubjective, 0);
   return Math.round(totalTss * factor);
 }
 
-export function calculateATL(date: string): number {
+export function calculateATL(date: string, dailyChecks: DailyCheck[], workouts: Workout[]): number {
   const targetDate = new Date(date);
   let totalTss = 0;
   let days = 0;
   
   for (let i = 0; i < 7; i++) {
     const checkDate = format(subDays(targetDate, i), 'yyyy-MM-dd');
-    const tss = getDailyTssEffective(checkDate);
+    const tss = getDailyTssEffective(checkDate, dailyChecks, workouts);
     totalTss += tss;
     days++;
   }
@@ -79,18 +76,15 @@ export function calculateATL(date: string): number {
   return days > 0 ? Math.round(totalTss / days) : 0;
 }
 
-export function calculateCTL(date: string): number {
-  const checks = getDailyChecks();
-  const workouts = getWorkouts();
-  
-  if (checks.length === 0 && workouts.length === 0) return 0;
+export function calculateCTL(date: string, dailyChecks: DailyCheck[], workouts: Workout[]): number {
+  if (dailyChecks.length === 0 && workouts.length === 0) return 0;
   
   const targetDate = new Date(date);
   const alpha = 2 / (42 + 1); // EMA decay factor
   
   // Get all dates with data
   const allDates = new Set([
-    ...checks.map(c => c.date),
+    ...dailyChecks.map(c => c.date),
     ...workouts.map(w => w.date),
   ]);
   
@@ -99,30 +93,30 @@ export function calculateCTL(date: string): number {
   
   // Initialize CTL with first week average
   const firstWeekDates = sortedDates.slice(0, 7);
-  let ctl = firstWeekDates.reduce((sum, d) => sum + getDailyTssEffective(d), 0) / Math.max(firstWeekDates.length, 1);
+  let ctl = firstWeekDates.reduce((sum, d) => sum + getDailyTssEffective(d, dailyChecks, workouts), 0) / Math.max(firstWeekDates.length, 1);
   
   // Calculate EMA up to target date
   for (const dateStr of sortedDates) {
     if (new Date(dateStr) > targetDate) break;
-    const tss = getDailyTssEffective(dateStr);
+    const tss = getDailyTssEffective(dateStr, dailyChecks, workouts);
     ctl = alpha * tss + (1 - alpha) * ctl;
   }
   
   return Math.round(ctl);
 }
 
-export function getTodayMetrics(): TodayMetrics {
+export function getTodayMetrics(dailyChecks: DailyCheck[], workouts: Workout[]): TodayMetrics {
   const today = format(new Date(), 'yyyy-MM-dd');
-  const check = getDailyChecks().find(c => c.date === today);
-  const hrvMetrics = getHRVMetrics(today);
+  const check = dailyChecks.find(c => c.date === today);
+  const hrvMetrics = getHRVMetrics(today, dailyChecks);
   
   const hrv = check?.hrv ?? 0;
   const baseline = hrvMetrics?.baseline7d ?? 0;
   const status = hrvMetrics?.status ?? 'OK';
   const factor = hrvMetrics?.factor ?? 1.0;
   
-  const ctl = calculateCTL(today);
-  const atl = calculateATL(today);
+  const ctl = calculateCTL(today, dailyChecks, workouts);
+  const atl = calculateATL(today, dailyChecks, workouts);
   const tsb = ctl - atl;
   
   // Determine recommendation
@@ -140,9 +134,8 @@ export function getTodayMetrics(): TodayMetrics {
   }
   
   // Check consecutive critical days
-  const checks = getDailyChecks();
   const yesterday = format(subDays(new Date(), 1), 'yyyy-MM-dd');
-  const yesterdayHrv = getHRVMetrics(yesterday);
+  const yesterdayHrv = getHRVMetrics(yesterday, dailyChecks);
   
   if (status === 'Critical' && yesterdayHrv?.status === 'Critical') {
     alert = 'HRV crítico por 2+ dias. Descanse!';
@@ -162,7 +155,7 @@ export function getTodayMetrics(): TodayMetrics {
   };
 }
 
-export function getWeeklyLoad(weekOffset: number = 0): WeeklyLoad {
+export function getWeeklyLoad(weekOffset: number, dailyChecks: DailyCheck[], workouts: Workout[]): WeeklyLoad {
   const targetDate = subDays(new Date(), weekOffset * 7);
   const weekStart = startOfWeek(targetDate, { weekStartsOn: 1 });
   const weekEnd = endOfWeek(targetDate, { weekStartsOn: 1 });
@@ -172,12 +165,12 @@ export function getWeeklyLoad(weekOffset: number = 0): WeeklyLoad {
   const days = eachDayOfInterval({ start: weekStart, end: weekEnd });
   const weeklyTss = days.reduce((sum, day) => {
     const dateStr = format(day, 'yyyy-MM-dd');
-    return sum + getDailyTssEffective(dateStr);
+    return sum + getDailyTssEffective(dateStr, dailyChecks, workouts);
   }, 0);
   
   const lastDay = format(weekEnd, 'yyyy-MM-dd');
-  const atl = calculateATL(lastDay);
-  const ctl = calculateCTL(lastDay);
+  const atl = calculateATL(lastDay, dailyChecks, workouts);
+  const ctl = calculateCTL(lastDay, dailyChecks, workouts);
   const tsb = ctl - atl;
   
   return {
@@ -189,11 +182,11 @@ export function getWeeklyLoad(weekOffset: number = 0): WeeklyLoad {
   };
 }
 
-export function getWeeklyHistory(weeks: number = 8): WeeklyLoad[] {
+export function getWeeklyHistory(weeks: number, dailyChecks: DailyCheck[], workouts: Workout[]): WeeklyLoad[] {
   const history: WeeklyLoad[] = [];
   
   for (let i = 0; i < weeks; i++) {
-    history.push(getWeeklyLoad(i));
+    history.push(getWeeklyLoad(i, dailyChecks, workouts));
   }
   
   return history;
@@ -207,20 +200,19 @@ export interface DailyTrendData {
   tsb: number;
 }
 
-export function get14DayTrend(): DailyTrendData[] {
+export function get14DayTrend(dailyChecks: DailyCheck[], workouts: Workout[]): DailyTrendData[] {
   const today = new Date();
   const trend: DailyTrendData[] = [];
-  const checks = getDailyChecks();
   
   for (let i = 13; i >= 0; i--) {
     const targetDate = subDays(today, i);
     const dateStr = format(targetDate, 'yyyy-MM-dd');
     const displayDate = format(targetDate, 'dd/MM');
     
-    const check = checks.find(c => c.date === dateStr);
-    const baseline = getHRVBaseline7d(dateStr);
-    const ctl = calculateCTL(dateStr);
-    const atl = calculateATL(dateStr);
+    const check = dailyChecks.find(c => c.date === dateStr);
+    const baseline = getHRVBaseline7d(dateStr, dailyChecks);
+    const ctl = calculateCTL(dateStr, dailyChecks, workouts);
+    const atl = calculateATL(dateStr, dailyChecks, workouts);
     const tsb = ctl - atl;
     
     trend.push({

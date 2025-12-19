@@ -3,8 +3,12 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { AuthProvider } from "@/hooks/useAuth";
+import { DataProvider } from "@/hooks/useData";
+import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { BottomNav } from "@/components/layout/BottomNav";
 import Index from "./pages/Index";
+import Auth from "./pages/Auth";
 import CheckIn from "./pages/CheckIn";
 import Workout from "./pages/Workout";
 import Week from "./pages/Week";
@@ -20,18 +24,23 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <div className="min-h-screen bg-background">
-          <Routes>
-            <Route path="/" element={<Index />} />
-            <Route path="/checkin" element={<CheckIn />} />
-            <Route path="/workout" element={<Workout />} />
-            <Route path="/week" element={<Week />} />
-            <Route path="/history" element={<History />} />
-            <Route path="/install" element={<Install />} />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-          <BottomNav />
-        </div>
+        <AuthProvider>
+          <DataProvider>
+            <div className="min-h-screen bg-background">
+              <Routes>
+                <Route path="/auth" element={<Auth />} />
+                <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+                <Route path="/checkin" element={<ProtectedRoute><CheckIn /></ProtectedRoute>} />
+                <Route path="/workout" element={<ProtectedRoute><Workout /></ProtectedRoute>} />
+                <Route path="/week" element={<ProtectedRoute><Week /></ProtectedRoute>} />
+                <Route path="/history" element={<ProtectedRoute><History /></ProtectedRoute>} />
+                <Route path="/install" element={<Install />} />
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+              <BottomNav />
+            </div>
+          </DataProvider>
+        </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
