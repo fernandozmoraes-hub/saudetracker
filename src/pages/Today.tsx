@@ -5,6 +5,7 @@ import { PageContainer } from '@/components/layout/PageContainer';
 import { MetricCard } from '@/components/ui/MetricCard';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { AICoach } from '@/components/AICoach';
+import { TrendCharts } from '@/components/TrendCharts';
 import { getTodayMetrics } from '@/lib/calculations';
 import { TodayMetrics } from '@/types/health';
 import { Heart, TrendingUp, TrendingDown, Activity, AlertTriangle, CheckCircle, PauseCircle } from 'lucide-react';
@@ -123,6 +124,10 @@ export default function Today() {
       
       {/* AI Coach Analysis */}
       <AICoach />
+      
+      {/* Trend Charts */}
+      <TrendCharts />
+      
       {/* Load Metrics */}
       <div className="grid grid-cols-3 gap-3">
         <MetricCard
