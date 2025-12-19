@@ -1,14 +1,11 @@
-import { useEffect, useState } from 'react';
 import { LineChart, Line, AreaChart, Area, XAxis, YAxis, ReferenceLine, ResponsiveContainer, Tooltip } from 'recharts';
 import { get14DayTrend, DailyTrendData } from '@/lib/calculations';
+import { useData } from '@/hooks/useData';
 import { Heart, TrendingUp } from 'lucide-react';
 
 export function TrendCharts() {
-  const [data, setData] = useState<DailyTrendData[]>([]);
-  
-  useEffect(() => {
-    setData(get14DayTrend());
-  }, []);
+  const { dailyChecks, workouts } = useData();
+  const data = get14DayTrend(dailyChecks, workouts);
   
   if (data.length === 0) {
     return null;

@@ -1,17 +1,25 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { getWeeklyHistory } from '@/lib/calculations';
-import { WeeklyLoad } from '@/types/health';
-import { TrendingUp, TrendingDown, Minus, Filter } from 'lucide-react';
+import { useData } from '@/hooks/useData';
+import { TrendingUp, TrendingDown, Minus, Filter, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 export default function History() {
-  const [history, setHistory] = useState<WeeklyLoad[]>([]);
+  const { dailyChecks, workouts, isLoading } = useData();
   const [weeksToShow, setWeeksToShow] = useState(8);
   
-  useEffect(() => {
-    setHistory(getWeeklyHistory(weeksToShow));
-  }, [weeksToShow]);
+  if (isLoading) {
+    return (
+      <PageContainer title="Histórico" subtitle="Evolução semanal de carga">
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="w-6 h-6 animate-spin text-primary" />
+        </div>
+      </PageContainer>
+    );
+  }
+  
+  const history = getWeeklyHistory(weeksToShow, dailyChecks, workouts);
   
   const getTrendIcon = (current: number, previous: number | undefined) => {
     if (!previous) return <Minus className="w-4 h-4 text-muted-foreground" />;

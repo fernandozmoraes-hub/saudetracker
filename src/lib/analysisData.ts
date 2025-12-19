@@ -1,15 +1,13 @@
 import { format, subDays } from 'date-fns';
-import { getDailyChecks, getWorkouts } from './storage';
+import { DailyCheck, Workout } from '@/types/health';
 import { getHRVMetrics, calculateATL, calculateCTL, getHRVBaseline7d } from './calculations';
 import { AnalysisData, TriggerResult, evaluateTriggers } from './triggers';
 
-export function buildAnalysisData(): { data: AnalysisData | null; triggerResult: TriggerResult } {
+export function buildAnalysisData(dailyChecks: DailyCheck[], workouts: Workout[]): { data: AnalysisData | null; triggerResult: TriggerResult } {
   const today = format(new Date(), 'yyyy-MM-dd');
-  const checks = getDailyChecks();
-  const workouts = getWorkouts();
   
-  const todayCheck = checks.find(c => c.date === today);
-  const hrvMetrics = getHRVMetrics(today);
+  const todayCheck = dailyChecks.find(c => c.date === today);
+  const hrvMetrics = getHRVMetrics(today, dailyChecks);
   
   // Check for minimum data
   if (!todayCheck) {
@@ -23,16 +21,16 @@ export function buildAnalysisData(): { data: AnalysisData | null; triggerResult:
     };
   }
   
-  const atl = calculateATL(today);
-  const ctl = calculateCTL(today);
+  const atl = calculateATL(today, dailyChecks, workouts);
+  const ctl = calculateCTL(today, dailyChecks, workouts);
   const tsb = ctl - atl;
-  const baseline = getHRVBaseline7d(today);
+  const baseline = getHRVBaseline7d(today, dailyChecks);
   
   // Calculate consecutive critical days
   let consecutiveCriticalDays = 0;
   for (let i = 0; i <= 7; i++) {
     const checkDate = format(subDays(new Date(), i), 'yyyy-MM-dd');
-    const hrv = getHRVMetrics(checkDate);
+    const hrv = getHRVMetrics(checkDate, dailyChecks);
     if (hrv?.status === 'Critical') {
       consecutiveCriticalDays++;
     } else {
@@ -44,7 +42,7 @@ export function buildAnalysisData(): { data: AnalysisData | null; triggerResult:
   let consecutiveLowSleepDays = 0;
   for (let i = 0; i <= 7; i++) {
     const checkDate = format(subDays(new Date(), i), 'yyyy-MM-dd');
-    const check = checks.find(c => c.date === checkDate);
+    const check = dailyChecks.find(c => c.date === checkDate);
     if (check && check.sleepHours < 6) {
       consecutiveLowSleepDays++;
     } else {
@@ -56,7 +54,7 @@ export function buildAnalysisData(): { data: AnalysisData | null; triggerResult:
   const atlValues: number[] = [];
   for (let i = 0; i < 5; i++) {
     const checkDate = format(subDays(new Date(), i), 'yyyy-MM-dd');
-    atlValues.push(calculateATL(checkDate));
+    atlValues.push(calculateATL(checkDate, dailyChecks, workouts));
   }
   
   let atlTrend5d: 'increasing' | 'stable' | 'decreasing' = 'stable';

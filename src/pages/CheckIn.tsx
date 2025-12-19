@@ -7,8 +7,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { StatusBadge } from '@/components/ui/StatusBadge';
-import { getDailyCheckByDate, saveDailyCheck } from '@/lib/storage';
-import { getHRVBaseline7d, getHRVStatus, getHRVFactor } from '@/lib/calculations';
+import { useData } from '@/hooks/useData';
+import { getHRVBaseline7d, getHRVStatus } from '@/lib/calculations';
 import { DailyCheck } from '@/types/health';
 import { useToast } from '@/hooks/use-toast';
 import { Heart, Moon, Brain, Save, Battery } from 'lucide-react';
@@ -16,6 +16,7 @@ import { Heart, Moon, Brain, Save, Battery } from 'lucide-react';
 export default function CheckIn() {
   const today = format(new Date(), 'yyyy-MM-dd');
   const { toast } = useToast();
+  const { dailyChecks, saveDailyCheck } = useData();
   
   const [formData, setFormData] = useState<Partial<DailyCheck>>({
     date: today,
@@ -31,23 +32,23 @@ export default function CheckIn() {
   const [hrvStatus, setHrvStatus] = useState<{ status: ReturnType<typeof getHRVStatus>; baseline: number } | null>(null);
   
   useEffect(() => {
-    const existing = getDailyCheckByDate(today);
+    const existing = dailyChecks.find(c => c.date === today);
     if (existing) {
       setFormData(existing);
     }
-  }, [today]);
+  }, [today, dailyChecks]);
   
   useEffect(() => {
     if (formData.hrv) {
-      const baseline = getHRVBaseline7d(today);
+      const baseline = getHRVBaseline7d(today, dailyChecks);
       const status = getHRVStatus(formData.hrv, baseline);
       setHrvStatus({ status, baseline });
     } else {
       setHrvStatus(null);
     }
-  }, [formData.hrv, today]);
+  }, [formData.hrv, today, dailyChecks]);
   
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!formData.hrv || !formData.restingHr || !formData.sleepHours || !formData.sleepQuality) {
@@ -70,12 +71,20 @@ export default function CheckIn() {
       notes: formData.notes,
     };
     
-    saveDailyCheck(check);
+    const success = await saveDailyCheck(check);
     
-    toast({
-      title: 'Check-in salvo!',
-      description: 'Seus dados de hoje foram registrados.',
-    });
+    if (success) {
+      toast({
+        title: 'Check-in salvo!',
+        description: 'Seus dados de hoje foram registrados.',
+      });
+    } else {
+      toast({
+        title: 'Erro ao salvar',
+        description: 'Não foi possível salvar o check-in.',
+        variant: 'destructive',
+      });
+    }
   };
   
   const RatingButtons = ({ 

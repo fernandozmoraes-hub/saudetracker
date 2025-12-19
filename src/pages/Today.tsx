@@ -1,14 +1,13 @@
-import { useEffect, useState } from 'react';
-import { format } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { MetricCard } from '@/components/ui/MetricCard';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { AICoach } from '@/components/AICoach';
 import { TrendCharts } from '@/components/TrendCharts';
 import { getTodayMetrics } from '@/lib/calculations';
-import { TodayMetrics } from '@/types/health';
-import { Heart, TrendingUp, TrendingDown, Activity, AlertTriangle, CheckCircle, PauseCircle } from 'lucide-react';
+import { useData } from '@/hooks/useData';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+import { Heart, TrendingUp, TrendingDown, Activity, AlertTriangle, CheckCircle, PauseCircle, Loader2 } from 'lucide-react';
 
 const recommendationConfig = {
   maintain: {
@@ -35,22 +34,19 @@ const recommendationConfig = {
 };
 
 export default function Today() {
-  const [metrics, setMetrics] = useState<TodayMetrics | null>(null);
+  const { dailyChecks, workouts, isLoading } = useData();
   
-  useEffect(() => {
-    setMetrics(getTodayMetrics());
-  }, []);
-  
-  if (!metrics) {
+  if (isLoading) {
     return (
       <PageContainer title="Hoje">
         <div className="flex items-center justify-center h-64">
-          <p className="text-muted-foreground">Carregando...</p>
+          <Loader2 className="w-6 h-6 animate-spin text-primary" />
         </div>
       </PageContainer>
     );
   }
   
+  const metrics = getTodayMetrics(dailyChecks, workouts);
   const recommendation = recommendationConfig[metrics.recommendation];
   
   return (

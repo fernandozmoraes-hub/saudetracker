@@ -1,30 +1,26 @@
-import { useEffect, useState } from 'react';
 import { format, startOfWeek, endOfWeek } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { MetricCard } from '@/components/ui/MetricCard';
 import { getWeeklyLoad } from '@/lib/calculations';
-import { WeeklyLoad } from '@/types/health';
-import { TrendingUp, TrendingDown, Minus, AlertTriangle, Calendar } from 'lucide-react';
+import { useData } from '@/hooks/useData';
+import { TrendingUp, TrendingDown, Minus, AlertTriangle, Calendar, Loader2 } from 'lucide-react';
 
 export default function Week() {
-  const [currentWeek, setCurrentWeek] = useState<WeeklyLoad | null>(null);
-  const [lastWeek, setLastWeek] = useState<WeeklyLoad | null>(null);
+  const { dailyChecks, workouts, isLoading } = useData();
   
-  useEffect(() => {
-    setCurrentWeek(getWeeklyLoad(0));
-    setLastWeek(getWeeklyLoad(1));
-  }, []);
-  
-  if (!currentWeek) {
+  if (isLoading) {
     return (
       <PageContainer title="Semana">
         <div className="flex items-center justify-center h-64">
-          <p className="text-muted-foreground">Carregando...</p>
+          <Loader2 className="w-6 h-6 animate-spin text-primary" />
         </div>
       </PageContainer>
     );
   }
+  
+  const currentWeek = getWeeklyLoad(0, dailyChecks, workouts);
+  const lastWeek = getWeeklyLoad(1, dailyChecks, workouts);
   
   const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
   const weekEnd = endOfWeek(new Date(), { weekStartsOn: 1 });
@@ -37,8 +33,8 @@ export default function Week() {
     return 'stable';
   };
   
-  const ctlTrend = lastWeek ? getTrend(currentWeek.ctl, lastWeek.ctl) : 'stable';
-  const atlTrend = lastWeek ? getTrend(currentWeek.atl, lastWeek.atl) : 'stable';
+  const ctlTrend = getTrend(currentWeek.ctl, lastWeek.ctl);
+  const atlTrend = getTrend(currentWeek.atl, lastWeek.atl);
   
   const isOverreaching = currentWeek.tsb < -15 || currentWeek.atl > currentWeek.ctl * 1.3;
   
@@ -76,12 +72,10 @@ export default function Week() {
           <p className="text-4xl font-display font-bold text-primary">
             {currentWeek.weeklyTss}
           </p>
-          {lastWeek && (
-            <div className="text-right">
-              <p className="text-sm text-muted-foreground">Semana anterior</p>
-              <p className="text-lg font-semibold">{lastWeek.weeklyTss}</p>
-            </div>
-          )}
+          <div className="text-right">
+            <p className="text-sm text-muted-foreground">Semana anterior</p>
+            <p className="text-lg font-semibold">{lastWeek.weeklyTss}</p>
+          </div>
         </div>
       </div>
       
@@ -119,41 +113,39 @@ export default function Week() {
       </div>
       
       {/* Comparison with last week */}
-      {lastWeek && (
-        <div className="space-y-3 animate-slide-up">
-          <h3 className="font-display font-semibold">Comparação Semanal</h3>
-          
-          <div className="grid grid-cols-3 gap-3 text-center">
-            <div className="p-3 rounded-lg bg-secondary">
-              <p className="text-xs text-muted-foreground mb-1">CTL</p>
-              <p className={`font-semibold ${
-                currentWeek.ctl > lastWeek.ctl ? 'text-status-ok' : 'text-status-alert'
-              }`}>
-                {currentWeek.ctl > lastWeek.ctl ? '+' : ''}
-                {currentWeek.ctl - lastWeek.ctl}
-              </p>
-            </div>
-            <div className="p-3 rounded-lg bg-secondary">
-              <p className="text-xs text-muted-foreground mb-1">ATL</p>
-              <p className={`font-semibold ${
-                currentWeek.atl < lastWeek.atl ? 'text-status-ok' : 'text-status-alert'
-              }`}>
-                {currentWeek.atl > lastWeek.atl ? '+' : ''}
-                {currentWeek.atl - lastWeek.atl}
-              </p>
-            </div>
-            <div className="p-3 rounded-lg bg-secondary">
-              <p className="text-xs text-muted-foreground mb-1">TSB</p>
-              <p className={`font-semibold ${
-                currentWeek.tsb > lastWeek.tsb ? 'text-status-ok' : 'text-status-alert'
-              }`}>
-                {currentWeek.tsb > lastWeek.tsb ? '+' : ''}
-                {currentWeek.tsb - lastWeek.tsb}
-              </p>
-            </div>
+      <div className="space-y-3 animate-slide-up">
+        <h3 className="font-display font-semibold">Comparação Semanal</h3>
+        
+        <div className="grid grid-cols-3 gap-3 text-center">
+          <div className="p-3 rounded-lg bg-secondary">
+            <p className="text-xs text-muted-foreground mb-1">CTL</p>
+            <p className={`font-semibold ${
+              currentWeek.ctl > lastWeek.ctl ? 'text-status-ok' : 'text-status-alert'
+            }`}>
+              {currentWeek.ctl > lastWeek.ctl ? '+' : ''}
+              {currentWeek.ctl - lastWeek.ctl}
+            </p>
+          </div>
+          <div className="p-3 rounded-lg bg-secondary">
+            <p className="text-xs text-muted-foreground mb-1">ATL</p>
+            <p className={`font-semibold ${
+              currentWeek.atl < lastWeek.atl ? 'text-status-ok' : 'text-status-alert'
+            }`}>
+              {currentWeek.atl > lastWeek.atl ? '+' : ''}
+              {currentWeek.atl - lastWeek.atl}
+            </p>
+          </div>
+          <div className="p-3 rounded-lg bg-secondary">
+            <p className="text-xs text-muted-foreground mb-1">TSB</p>
+            <p className={`font-semibold ${
+              currentWeek.tsb > lastWeek.tsb ? 'text-status-ok' : 'text-status-alert'
+            }`}>
+              {currentWeek.tsb > lastWeek.tsb ? '+' : ''}
+              {currentWeek.tsb - lastWeek.tsb}
+            </p>
           </div>
         </div>
-      )}
+      </div>
       
       {/* Guide */}
       <div className="text-xs text-muted-foreground space-y-1 p-4 rounded-lg bg-secondary/50">
