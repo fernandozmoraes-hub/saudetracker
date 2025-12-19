@@ -19,6 +19,8 @@ export interface Workout {
   rpe: number; // 0-10
   tssSubjective: number; // calculated: (duration × rpe) / 10
   validated: boolean; // for strength training
+  distanceKm?: number; // km, for Run/Bike
+  avgHr?: number; // bpm, for Run/Bike
 }
 
 export type HRVStatus = 'OK' | 'Alert' | 'Critical';

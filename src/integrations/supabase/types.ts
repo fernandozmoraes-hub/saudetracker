@@ -61,8 +61,10 @@ export type Database = {
       }
       workouts: {
         Row: {
+          avg_hr: number | null
           created_at: string
           date: string
+          distance_km: number | null
           duration_min: number
           id: string
           rpe: number
@@ -72,8 +74,10 @@ export type Database = {
           validated: boolean
         }
         Insert: {
+          avg_hr?: number | null
           created_at?: string
           date: string
+          distance_km?: number | null
           duration_min?: number
           id?: string
           rpe?: number
@@ -83,8 +87,10 @@ export type Database = {
           validated?: boolean
         }
         Update: {
+          avg_hr?: number | null
           created_at?: string
           date?: string
+          distance_km?: number | null
           duration_min?: number
           id?: string
           rpe?: number
