@@ -4,6 +4,7 @@ import { ptBR } from 'date-fns/locale';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { MetricCard } from '@/components/ui/MetricCard';
 import { StatusBadge } from '@/components/ui/StatusBadge';
+import { AICoach } from '@/components/AICoach';
 import { getTodayMetrics } from '@/lib/calculations';
 import { TodayMetrics } from '@/types/health';
 import { Heart, TrendingUp, TrendingDown, Activity, AlertTriangle, CheckCircle, PauseCircle } from 'lucide-react';
@@ -120,6 +121,8 @@ export default function Today() {
         <p className="text-sm text-muted-foreground">{recommendation.description}</p>
       </div>
       
+      {/* AI Coach Analysis */}
+      <AICoach />
       {/* Load Metrics */}
       <div className="grid grid-cols-3 gap-3">
         <MetricCard
