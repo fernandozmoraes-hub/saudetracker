@@ -5,6 +5,7 @@ export interface DailyCheck {
   sleepHours: number; // decimal
   sleepQuality: number; // 1-5
   mood?: number; // 1-5
+  bodyBattery?: number; // 0-100
   notes?: string;
 }
 
