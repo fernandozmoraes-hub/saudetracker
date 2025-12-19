@@ -7,30 +7,36 @@ const corsHeaders = {
 
 const SYSTEM_PROMPT = `Você é um treinador experiente em atletas master (50+), especializado em saúde, longevidade e progressão sustentável.
 
-Seu papel é avaliar diariamente o progresso do treino, com base em dados fisiológicos, carga e percepção subjetiva.
+IMPORTANTE - REGRAS OBRIGATÓRIAS:
+- Você NÃO deve classificar risco
+- Você NÃO deve usar termos como "Alto Risco", "Seguro", "Atenção", "🟢", "🟡", "🔴"
+- A classificação do dia já foi definida pelo sistema e será fornecida a você como "STATUS DO DIA"
+- Nunca contradiga o status recebido
+- Nunca gere uma nova classificação
+- Nunca use emojis de cores/risco
 
-Você NÃO deve prescrever treinos específicos, aumentar carga, sugerir intensidade ou substituir métricas objetivas.
-
-Você DEVE:
+Seu papel é APENAS:
 - Interpretar HRV, sono, FC de repouso e carga (TSS, ATL, CTL, TSB)
-- Avaliar risco de fadiga excessiva ou overreaching
-- Comentar decisões acertadas ou sinais de alerta
-- Sugerir ajustes gerais (ex.: manter, reduzir, priorizar recuperação)
-
-Regras de segurança (obrigatórias):
-- Se TSB < −15, sempre sinalizar alto risco
-- Se HRV estiver em estado "Critical" por 2 ou mais dias consecutivos, nunca sugerir intensidade
-- Se sono < 6 horas, priorizar recuperação
+- Explicar o contexto fisiológico do dia baseado no status recebido
+- Apontar pontos positivos e pontos de atenção nos dados
+- Sugerir foco geral (ex: recuperação, manutenção, cautela)
+- Comentar decisões acertadas ou sinais que merecem observação
 
 Formato da resposta:
 - 1 parágrafo curto (3–5 linhas)
 - Linguagem clara, objetiva e técnica
 - Sem motivação genérica
 - Sem termos vagos
-
-Classifique o dia como: 🟢 Seguro, 🟡 Atenção, ou 🔴 Alto Risco
+- Foque na explicação dos dados, não na classificação
 
 O objetivo é apoiar decisões conscientes, preservar saúde e permitir evolução consistente ao longo do tempo.`;
+
+const statusLabels: Record<string, string> = {
+  safe: 'SEGURO',
+  attention: 'ATENÇÃO',
+  risk: 'ALTO RISCO',
+  blocked: 'BLOQUEADO'
+};
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -59,8 +65,11 @@ serve(async (req) => {
       throw new Error("LOVABLE_API_KEY is not configured");
     }
 
-    // Build the user prompt with the data
-    const userPrompt = `Analise os seguintes dados do atleta:
+    // Build the user prompt with the data - STATUS is pre-defined by triggers
+    const userPrompt = `**STATUS DO DIA (PRÉ-DEFINIDO PELO SISTEMA): ${statusLabels[triggerResult.classification]}**
+${triggerResult.reasons.length > 0 ? `Motivos do sistema: ${triggerResult.reasons.join(', ')}` : ''}
+
+Analise os seguintes dados do atleta e forneça contexto fisiológico para o status acima:
 
 **Dados de hoje:**
 - HRV: ${analysisData.today.hrv} ms (Status: ${analysisData.today.hrvStatus})
@@ -81,15 +90,12 @@ ${analysisData.today.mood ? `- Humor: ${analysisData.today.mood}/5` : ''}
 - Dias consecutivos com sono < 6h: ${analysisData.trends.consecutiveLowSleepDays}
 - Tendência ATL 5d: ${analysisData.trends.atlTrend5d}
 
-**Classificação prévia dos gatilhos:** ${triggerResult.classification.toUpperCase()}
-${triggerResult.reasons.length > 0 ? `Motivos: ${triggerResult.reasons.join(', ')}` : ''}
-
 **Treinos recentes (últimos 7 dias):**
 ${analysisData.recentWorkouts.length > 0 
   ? analysisData.recentWorkouts.map((w: any) => `- ${w.date}: ${w.type}, ${w.durationMin}min, RPE ${w.rpe}, TSS ${w.tssSubjective}`).join('\n')
   : '- Nenhum treino registrado'}
 
-Forneça sua avaliação seguindo o formato especificado.`;
+Forneça sua análise contextual, explicando os dados sem reclassificar o status.`;
 
     console.log('Calling Lovable AI Gateway...');
     
