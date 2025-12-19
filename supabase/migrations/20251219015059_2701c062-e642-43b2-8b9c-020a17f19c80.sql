@@ -1,0 +1,1 @@
+ALTER TABLE public.daily_checks ADD COLUMN body_battery integer;

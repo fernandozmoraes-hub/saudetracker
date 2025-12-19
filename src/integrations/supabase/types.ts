@@ -16,6 +16,7 @@ export type Database = {
     Tables: {
       daily_checks: {
         Row: {
+          body_battery: number | null
           created_at: string
           date: string
           hrv: number
@@ -29,6 +30,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          body_battery?: number | null
           created_at?: string
           date: string
           hrv: number
@@ -42,6 +44,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          body_battery?: number | null
           created_at?: string
           date?: string
           hrv?: number

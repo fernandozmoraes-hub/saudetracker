@@ -11,7 +11,7 @@ import { getDailyCheckByDate, saveDailyCheck } from '@/lib/storage';
 import { getHRVBaseline7d, getHRVStatus, getHRVFactor } from '@/lib/calculations';
 import { DailyCheck } from '@/types/health';
 import { useToast } from '@/hooks/use-toast';
-import { Heart, Moon, Brain, Save } from 'lucide-react';
+import { Heart, Moon, Brain, Save, Battery } from 'lucide-react';
 
 export default function CheckIn() {
   const today = format(new Date(), 'yyyy-MM-dd');
@@ -24,6 +24,7 @@ export default function CheckIn() {
     sleepHours: undefined,
     sleepQuality: 3,
     mood: 3,
+    bodyBattery: undefined,
     notes: '',
   });
   
@@ -65,6 +66,7 @@ export default function CheckIn() {
       sleepHours: formData.sleepHours,
       sleepQuality: formData.sleepQuality,
       mood: formData.mood,
+      bodyBattery: formData.bodyBattery,
       notes: formData.notes,
     };
     
@@ -189,15 +191,34 @@ export default function CheckIn() {
           </div>
         </div>
         
-        <div className="space-y-2">
-          <Label className="flex items-center gap-2">
-            <Brain className="w-4 h-4 text-primary" />
-            Humor (1-5) - opcional
-          </Label>
-          <RatingButtons 
-            value={formData.mood} 
-            onChange={(v) => setFormData({ ...formData, mood: v })}
-          />
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="bodyBattery" className="flex items-center gap-2">
+              <Battery className="w-4 h-4 text-primary" />
+              Body Battery
+            </Label>
+            <Input
+              id="bodyBattery"
+              type="number"
+              placeholder="Ex: 75"
+              min={0}
+              max={100}
+              value={formData.bodyBattery || ''}
+              onChange={(e) => setFormData({ ...formData, bodyBattery: Number(e.target.value) || undefined })}
+              className="text-lg"
+            />
+          </div>
+          
+          <div className="space-y-2">
+            <Label className="flex items-center gap-2">
+              <Brain className="w-4 h-4 text-primary" />
+              Humor (1-5)
+            </Label>
+            <RatingButtons 
+              value={formData.mood} 
+              onChange={(v) => setFormData({ ...formData, mood: v })}
+            />
+          </div>
         </div>
         
         <div className="space-y-2">
