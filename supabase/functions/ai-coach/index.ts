@@ -95,7 +95,22 @@ serve(async (req) => {
   }
 
   try {
-    const { analysisData, triggerResult } = await req.json();
+    // Parse and validate input
+    const rawBody = await req.json();
+    const parseResult = RequestBodySchema.safeParse(rawBody);
+    
+    if (!parseResult.success) {
+      console.error('Input validation failed:', parseResult.error.flatten());
+      return new Response(JSON.stringify({ 
+        error: 'Dados de entrada inválidos',
+        details: parseResult.error.flatten().fieldErrors
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    
+    const { analysisData, triggerResult } = parseResult.data;
     
     console.log('AI Coach request received:', { triggerResult });
     
