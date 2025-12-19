@@ -198,3 +198,39 @@ export function getWeeklyHistory(weeks: number = 8): WeeklyLoad[] {
   
   return history;
 }
+
+export interface DailyTrendData {
+  date: string;        // 'dd/MM'
+  fullDate: string;    // 'yyyy-MM-dd'
+  hrv: number | null;
+  hrvBaseline: number;
+  tsb: number;
+}
+
+export function get14DayTrend(): DailyTrendData[] {
+  const today = new Date();
+  const trend: DailyTrendData[] = [];
+  const checks = getDailyChecks();
+  
+  for (let i = 13; i >= 0; i--) {
+    const targetDate = subDays(today, i);
+    const dateStr = format(targetDate, 'yyyy-MM-dd');
+    const displayDate = format(targetDate, 'dd/MM');
+    
+    const check = checks.find(c => c.date === dateStr);
+    const baseline = getHRVBaseline7d(dateStr);
+    const ctl = calculateCTL(dateStr);
+    const atl = calculateATL(dateStr);
+    const tsb = ctl - atl;
+    
+    trend.push({
+      date: displayDate,
+      fullDate: dateStr,
+      hrv: check?.hrv ?? null,
+      hrvBaseline: baseline,
+      tsb,
+    });
+  }
+  
+  return trend;
+}
