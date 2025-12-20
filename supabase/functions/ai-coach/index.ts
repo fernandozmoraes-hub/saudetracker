@@ -16,7 +16,7 @@ const WorkoutSchema = z.object({
 });
 
 const TodayDataSchema = z.object({
-  hrv: z.number().min(0).max(300),
+  hrv: z.number().min(-300).max(300), // Aceita negativos temporariamente para dados legados
   hrvStatus: z.string().max(20),
   restingHr: z.number().min(20).max(250),
   sleepHours: z.number().min(0).max(24),
