@@ -19,7 +19,7 @@ export default function History() {
     );
   }
   
-  const history = getWeeklyHistory(weeksToShow, dailyChecks, workouts);
+  const history = getWeeklyHistory(weeksToShow, workouts);
   
   const getTrendIcon = (current: number, previous: number | undefined) => {
     if (!previous) return <Minus className="w-4 h-4 text-muted-foreground" />;

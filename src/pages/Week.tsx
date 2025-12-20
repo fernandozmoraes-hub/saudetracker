@@ -19,8 +19,8 @@ export default function Week() {
     );
   }
   
-  const currentWeek = getWeeklyLoad(0, dailyChecks, workouts);
-  const lastWeek = getWeeklyLoad(1, dailyChecks, workouts);
+  const currentWeek = getWeeklyLoad(0, workouts);
+  const lastWeek = getWeeklyLoad(1, workouts);
   
   const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
   const weekEnd = endOfWeek(new Date(), { weekStartsOn: 1 });

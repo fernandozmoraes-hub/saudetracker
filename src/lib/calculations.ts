@@ -174,53 +174,59 @@ export function getHRVMetrics(date: string, dailyChecks: DailyCheck[]): HRVMetri
   };
 }
 
-export function getDailyTssEffective(date: string, dailyChecks: DailyCheck[], workouts: Workout[]): number {
+/**
+ * Get total TSS for a given date
+ * TSS v2: Uses tssFinal directly (immutable at save time)
+ * HRV factor is NO LONGER applied here - TSS is locked when saved
+ * Falls back to tssSubjective for legacy workouts without tssFinal
+ */
+export function getDailyTssEffective(date: string, workouts: Workout[]): number {
   const dateWorkouts = workouts.filter(w => w.date === date);
-  const hrvMetrics = getHRVMetrics(date, dailyChecks);
-  const factor = hrvMetrics?.factor ?? 1.0;
-  
-  const totalTss = dateWorkouts.reduce((sum, w) => sum + w.tssSubjective, 0);
-  return Math.round(totalTss * factor);
+  // Use tssFinal if available, otherwise fall back to tssSubjective for legacy data
+  const totalTss = dateWorkouts.reduce((sum, w) => sum + (w.tssFinal ?? w.tssSubjective), 0);
+  return Math.round(totalTss);
 }
 
-export function calculateATL(date: string, dailyChecks: DailyCheck[], workouts: Workout[]): number {
+/**
+ * Calculate Acute Training Load (ATL) - 7-day rolling average
+ * TSS v2: Uses tssFinal directly, no HRV factor
+ */
+export function calculateATL(date: string, workouts: Workout[]): number {
   const targetDate = new Date(date);
   let totalTss = 0;
-  let days = 0;
   
   for (let i = 0; i < 7; i++) {
     const checkDate = format(subDays(targetDate, i), 'yyyy-MM-dd');
-    const tss = getDailyTssEffective(checkDate, dailyChecks, workouts);
+    const tss = getDailyTssEffective(checkDate, workouts);
     totalTss += tss;
-    days++;
   }
   
-  return days > 0 ? Math.round(totalTss / days) : 0;
+  return Math.round(totalTss / 7);
 }
 
-export function calculateCTL(date: string, dailyChecks: DailyCheck[], workouts: Workout[]): number {
-  if (dailyChecks.length === 0 && workouts.length === 0) return 0;
+/**
+ * Calculate Chronic Training Load (CTL) - 42-day exponential moving average
+ * TSS v2: Uses tssFinal directly, no HRV factor
+ */
+export function calculateCTL(date: string, workouts: Workout[]): number {
+  if (workouts.length === 0) return 0;
   
   const targetDate = new Date(date);
   const alpha = 2 / (42 + 1); // EMA decay factor
   
-  // Get all dates with data
-  const allDates = new Set([
-    ...dailyChecks.map(c => c.date),
-    ...workouts.map(w => w.date),
-  ]);
-  
+  // Get all unique workout dates
+  const allDates = new Set(workouts.map(w => w.date));
   const sortedDates = Array.from(allDates).sort();
   if (sortedDates.length === 0) return 0;
   
   // Initialize CTL with first week average
   const firstWeekDates = sortedDates.slice(0, 7);
-  let ctl = firstWeekDates.reduce((sum, d) => sum + getDailyTssEffective(d, dailyChecks, workouts), 0) / Math.max(firstWeekDates.length, 1);
+  let ctl = firstWeekDates.reduce((sum, d) => sum + getDailyTssEffective(d, workouts), 0) / Math.max(firstWeekDates.length, 1);
   
   // Calculate EMA up to target date
   for (const dateStr of sortedDates) {
     if (new Date(dateStr) > targetDate) break;
-    const tss = getDailyTssEffective(dateStr, dailyChecks, workouts);
+    const tss = getDailyTssEffective(dateStr, workouts);
     ctl = alpha * tss + (1 - alpha) * ctl;
   }
   
@@ -237,8 +243,9 @@ export function getTodayMetrics(dailyChecks: DailyCheck[], workouts: Workout[]):
   const status = hrvMetrics?.status ?? 'OK';
   const factor = hrvMetrics?.factor ?? 1.0;
   
-  const ctl = calculateCTL(today, dailyChecks, workouts);
-  const atl = calculateATL(today, dailyChecks, workouts);
+  // TSS v2: CTL/ATL use tssFinal directly
+  const ctl = calculateCTL(today, workouts);
+  const atl = calculateATL(today, workouts);
   const tsb = ctl - atl;
   
   // Determine recommendation
@@ -277,7 +284,7 @@ export function getTodayMetrics(dailyChecks: DailyCheck[], workouts: Workout[]):
   };
 }
 
-export function getWeeklyLoad(weekOffset: number, dailyChecks: DailyCheck[], workouts: Workout[]): WeeklyLoad {
+export function getWeeklyLoad(weekOffset: number, workouts: Workout[]): WeeklyLoad {
   const targetDate = subDays(new Date(), weekOffset * 7);
   const weekStart = startOfWeek(targetDate, { weekStartsOn: 1 });
   const weekEnd = endOfWeek(targetDate, { weekStartsOn: 1 });
@@ -287,12 +294,12 @@ export function getWeeklyLoad(weekOffset: number, dailyChecks: DailyCheck[], wor
   const days = eachDayOfInterval({ start: weekStart, end: weekEnd });
   const weeklyTss = days.reduce((sum, day) => {
     const dateStr = format(day, 'yyyy-MM-dd');
-    return sum + getDailyTssEffective(dateStr, dailyChecks, workouts);
+    return sum + getDailyTssEffective(dateStr, workouts);
   }, 0);
   
   const lastDay = format(weekEnd, 'yyyy-MM-dd');
-  const atl = calculateATL(lastDay, dailyChecks, workouts);
-  const ctl = calculateCTL(lastDay, dailyChecks, workouts);
+  const atl = calculateATL(lastDay, workouts);
+  const ctl = calculateCTL(lastDay, workouts);
   const tsb = ctl - atl;
   
   return {
@@ -304,11 +311,11 @@ export function getWeeklyLoad(weekOffset: number, dailyChecks: DailyCheck[], wor
   };
 }
 
-export function getWeeklyHistory(weeks: number, dailyChecks: DailyCheck[], workouts: Workout[]): WeeklyLoad[] {
+export function getWeeklyHistory(weeks: number, workouts: Workout[]): WeeklyLoad[] {
   const history: WeeklyLoad[] = [];
   
   for (let i = 0; i < weeks; i++) {
-    history.push(getWeeklyLoad(i, dailyChecks, workouts));
+    history.push(getWeeklyLoad(i, workouts));
   }
   
   return history;
@@ -333,8 +340,9 @@ export function get14DayTrend(dailyChecks: DailyCheck[], workouts: Workout[]): D
     
     const check = dailyChecks.find(c => c.date === dateStr);
     const baseline = getHRVBaseline7d(dateStr, dailyChecks);
-    const ctl = calculateCTL(dateStr, dailyChecks, workouts);
-    const atl = calculateATL(dateStr, dailyChecks, workouts);
+    // TSS v2: CTL/ATL use tssFinal directly
+    const ctl = calculateCTL(dateStr, workouts);
+    const atl = calculateATL(dateStr, workouts);
     const tsb = ctl - atl;
     
     trend.push({
