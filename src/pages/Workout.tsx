@@ -10,10 +10,12 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useData } from '@/hooks/useData';
-import { calculateTssSubjective, getHRVMetrics } from '@/lib/calculations';
+import { useUserSettings } from '@/hooks/useUserSettings';
+import { calculateTssSubjective, calculateTssFinal } from '@/lib/calculations';
 import { Workout as WorkoutType, WorkoutType as WorkoutTypeEnum } from '@/types/health';
 import { useToast } from '@/hooks/use-toast';
-import { Dumbbell, Bike, Timer, Activity, Check, MapPin, Heart, CalendarIcon } from 'lucide-react';
+import { Dumbbell, Bike, Timer, Activity, Check, MapPin, Heart, CalendarIcon, Settings } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 const workoutTypes: { type: WorkoutTypeEnum; label: string; icon: React.ReactNode }[] = [
   { type: 'Run', label: 'Corrida', icon: <Activity className="w-5 h-5" /> },
@@ -37,7 +39,8 @@ const muscleGroupOptions = [
 
 export default function Workout() {
   const { toast } = useToast();
-  const { dailyChecks, workouts, saveWorkout } = useData();
+  const { workouts, saveWorkout } = useData();
+  const { settings } = useUserSettings();
   
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [selectedType, setSelectedType] = useState<WorkoutTypeEnum | null>(null);
@@ -49,9 +52,13 @@ export default function Workout() {
   const [muscleGroups, setMuscleGroups] = useState<string[]>([]);
   
   const dateString = format(selectedDate, 'yyyy-MM-dd');
+  
+  // Calculate TSS using the new hybrid model
+  const tssResult = selectedType && duration && rpe 
+    ? calculateTssFinal(selectedType, duration, rpe, validated, avgHr, settings.lthr)
+    : null;
+  
   const tssSubjective = duration && rpe ? calculateTssSubjective(duration, rpe) : 0;
-  const hrvMetrics = getHRVMetrics(dateString, dailyChecks);
-  const tssEffective = Math.round(tssSubjective * (hrvMetrics?.factor ?? 1.0));
 
   const toggleMuscleGroup = (groupId: string) => {
     setMuscleGroups(prev => 
@@ -82,29 +89,30 @@ export default function Workout() {
       return;
     }
     
-    // Determinar sessionType baseado no tipo de treino
-    const sessionType = (selectedType === 'Run' || selectedType === 'Bike') 
-      ? 'endurance' 
-      : selectedType === 'Strength' 
-        ? 'strength' 
-        : 'legacy';
-    
-    // Por enquanto, usar v1_rpe para manter compatibilidade (Fase 3 implementará v2_hybrid)
-    const tssFinalValue = selectedType === 'Rest' ? 0 : tssSubjective;
+    // Use TSS v2 hybrid model
+    const tssCalc = calculateTssFinal(
+      selectedType, 
+      duration || 0, 
+      rpe, 
+      validated, 
+      avgHr, 
+      settings.lthr
+    );
     
     const workout: WorkoutType = {
       id: '', // Empty string - Supabase will generate UUID
       date: dateString,
       type: selectedType,
-      sessionType: sessionType as WorkoutType['sessionType'],
-      tssVersion: 'v1_rpe', // Será atualizado para v2_hybrid na Fase 3
+      sessionType: tssCalc.sessionType,
+      tssVersion: tssCalc.tssVersion,
       durationMin: selectedType === 'Rest' ? 0 : (duration || 0),
       rpe: selectedType === 'Rest' ? 0 : rpe,
       tssSubjective: selectedType === 'Rest' ? 0 : tssSubjective,
-      tssFinal: tssFinalValue,
+      tssFinal: tssCalc.tssFinal,
       validated: selectedType === 'Strength' ? validated : true,
       distanceKm: (selectedType === 'Run' || selectedType === 'Bike') ? distance : undefined,
       avgHr: (selectedType === 'Run' || selectedType === 'Bike') ? avgHr : undefined,
+      lthrUsed: tssCalc.lthrUsed,
       muscleGroups: selectedType === 'Strength' && muscleGroups.length > 0 ? muscleGroups : undefined,
     };
     
@@ -113,7 +121,7 @@ export default function Workout() {
     if (success) {
       toast({
         title: 'Treino registrado!',
-        description: `${selectedType === 'Rest' ? 'Dia de descanso' : `TSS efetivo: ${tssEffective}`}`,
+        description: `${selectedType === 'Rest' ? 'Dia de descanso' : `TSS: ${tssCalc.tssFinal}`}`,
       });
       
       // Reset form
@@ -329,21 +337,49 @@ export default function Workout() {
               </div>
             )}
             
-            {duration && rpe > 0 && (
-              <div className="grid grid-cols-2 gap-4 animate-slide-up">
-                <div className="gradient-card rounded-xl p-4 border border-border/50">
-                  <p className="text-sm text-muted-foreground">TSS Subjetivo</p>
-                  <p className="text-2xl font-display font-bold">{tssSubjective}</p>
-                </div>
+            {duration && rpe > 0 && tssResult && (
+              <div className="space-y-3 animate-slide-up">
                 <div className="gradient-card rounded-xl p-4 border border-primary/30">
-                  <p className="text-sm text-muted-foreground">TSS Efetivo</p>
-                  <p className="text-2xl font-display font-bold text-primary">{tssEffective}</p>
-                  {hrvMetrics && hrvMetrics.factor < 1 && (
-                    <p className="text-xs text-status-alert mt-1">
-                      HRV fator: {hrvMetrics.factor}
-                    </p>
-                  )}
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-sm text-muted-foreground">TSS Final</p>
+                    <span className={`text-xs px-2 py-0.5 rounded-full ${
+                      tssResult.tssVersion === 'v2_hybrid' 
+                        ? 'bg-primary/20 text-primary' 
+                        : 'bg-secondary text-muted-foreground'
+                    }`}>
+                      {tssResult.tssVersion === 'v2_hybrid' ? 'HR-TSS' : 'RPE-TSS'}
+                    </span>
+                  </div>
+                  <p className="text-3xl font-display font-bold text-primary">{tssResult.tssFinal}</p>
+                  
+                  {/* Show calculation details */}
+                  <div className="mt-3 pt-3 border-t border-border/30 text-xs text-muted-foreground space-y-1">
+                    {tssResult.sessionType === 'endurance' && tssResult.lthrUsed && (
+                      <>
+                        <p>Cálculo baseado em FC média</p>
+                        <p>LTHR usado: {tssResult.lthrUsed} bpm 
+                          <Link to="/settings" className="text-primary hover:underline ml-1">
+                            <Settings className="w-3 h-3 inline" />
+                          </Link>
+                        </p>
+                      </>
+                    )}
+                    {tssResult.sessionType === 'strength' && (
+                      <p>Cálculo baseado em RPE {validated ? '(validado)' : '(×0.7)'}</p>
+                    )}
+                    {tssResult.sessionType === 'legacy' && (
+                      <p>Cálculo legado (RPE × duração)</p>
+                    )}
+                  </div>
                 </div>
+
+                {/* Comparison with RPE-TSS for endurance */}
+                {tssResult.sessionType === 'endurance' && tssResult.tssVersion === 'v2_hybrid' && (
+                  <div className="flex items-center justify-between p-3 rounded-lg bg-secondary/50 text-sm">
+                    <span className="text-muted-foreground">TSS por RPE (comparação):</span>
+                    <span className="font-medium">{tssSubjective}</span>
+                  </div>
+                )}
               </div>
             )}
           </>

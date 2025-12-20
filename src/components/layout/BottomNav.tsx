@@ -1,13 +1,13 @@
 import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
-import { Heart, Dumbbell, Home, Calendar, History } from 'lucide-react';
+import { Heart, Dumbbell, Home, Calendar, Settings } from 'lucide-react';
 
 const navItems = [
   { path: '/checkin', label: 'Check-in', icon: Heart },
   { path: '/workout', label: 'Treino', icon: Dumbbell },
   { path: '/', label: 'Hoje', icon: Home },
   { path: '/week', label: 'Semana', icon: Calendar },
-  { path: '/history', label: 'Histórico', icon: History },
+  { path: '/settings', label: 'Config', icon: Settings },
 ];
 
 export function BottomNav() {
