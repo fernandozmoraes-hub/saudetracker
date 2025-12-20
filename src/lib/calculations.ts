@@ -1,8 +1,130 @@
-import { DailyCheck, Workout, HRVStatus, HRVMetrics, TodayMetrics, WeeklyLoad } from '@/types/health';
+import { DailyCheck, Workout, HRVStatus, HRVMetrics, TodayMetrics, WeeklyLoad, SessionType, TssVersion } from '@/types/health';
 import { format, subDays, startOfWeek, endOfWeek, eachDayOfInterval, getISOWeek, getYear } from 'date-fns';
 
+// ============================================================
+// TSS v2 Hybrid Model - Calculation Functions
+// ============================================================
+
+// Default LTHR if user hasn't configured one
+export const DEFAULT_LTHR = 165;
+
+/**
+ * Calculate RPE-based TSS (legacy and strength)
+ * Formula: (duration × RPE) / 10
+ * Used for: Strength training and legacy workouts
+ */
 export function calculateTssSubjective(durationMin: number, rpe: number): number {
   return Math.round((durationMin * rpe) / 10);
+}
+
+/**
+ * Calculate RPE-TSS for strength training
+ * Formula: (duration × RPE × validationFactor) / 10
+ * validationFactor: 1.0 if validated, 0.7 if not validated
+ * Used for: Strength/resistance training sessions
+ */
+export function calculateRpeTss(durationMin: number, rpe: number, validated: boolean = true): number {
+  const validationFactor = validated ? 1.0 : 0.7;
+  return Math.round((durationMin * rpe * validationFactor) / 10);
+}
+
+/**
+ * Calculate Intensity Factor (IF) from heart rate
+ * Formula: avgHR / LTHR
+ * LTHR = Lactate Threshold Heart Rate (user configured, default 165 bpm)
+ */
+export function calculateIntensityFactor(avgHr: number, lthr: number = DEFAULT_LTHR): number {
+  if (lthr <= 0) return 0;
+  return avgHr / lthr;
+}
+
+/**
+ * Calculate HR-TSS for endurance activities
+ * Formula: (duration × IF²) × 100 / 60
+ * Simplified: duration × IF² × 1.667
+ * Where IF = avgHR / LTHR
+ * Used for: Running, Cycling, and other cardio sessions with HR data
+ */
+export function calculateHrTss(durationMin: number, avgHr: number, lthr: number = DEFAULT_LTHR): number {
+  if (!avgHr || avgHr <= 0 || lthr <= 0) return 0;
+  
+  const intensityFactor = calculateIntensityFactor(avgHr, lthr);
+  // Formula: (duration in minutes × IF²) × 100 / 60
+  const hrTss = (durationMin * intensityFactor * intensityFactor) * 100 / 60;
+  
+  return Math.round(hrTss);
+}
+
+/**
+ * Determine session type based on workout type
+ */
+export function getSessionType(workoutType: string): SessionType {
+  switch (workoutType) {
+    case 'Run':
+    case 'Bike':
+      return 'endurance';
+    case 'Strength':
+      return 'strength';
+    default:
+      return 'legacy';
+  }
+}
+
+/**
+ * Calculate final TSS based on session type and available data
+ * This is the main function that determines which TSS formula to use
+ */
+export interface TssCalculationResult {
+  tssFinal: number;
+  tssVersion: TssVersion;
+  sessionType: SessionType;
+  lthrUsed?: number;
+}
+
+export function calculateTssFinal(
+  workoutType: string,
+  durationMin: number,
+  rpe: number,
+  validated: boolean = true,
+  avgHr?: number,
+  lthr: number = DEFAULT_LTHR
+): TssCalculationResult {
+  const sessionType = getSessionType(workoutType);
+  
+  // Rest days have zero TSS
+  if (workoutType === 'Rest') {
+    return {
+      tssFinal: 0,
+      tssVersion: 'v2_hybrid',
+      sessionType: 'legacy',
+    };
+  }
+  
+  // Endurance activities with HR data → HR-TSS
+  if (sessionType === 'endurance' && avgHr && avgHr > 0) {
+    return {
+      tssFinal: calculateHrTss(durationMin, avgHr, lthr),
+      tssVersion: 'v2_hybrid',
+      sessionType: 'endurance',
+      lthrUsed: lthr,
+    };
+  }
+  
+  // Strength training → RPE-TSS with validation factor
+  if (sessionType === 'strength') {
+    return {
+      tssFinal: calculateRpeTss(durationMin, rpe, validated),
+      tssVersion: 'v2_hybrid',
+      sessionType: 'strength',
+    };
+  }
+  
+  // Legacy fallback (endurance without HR, or unknown types) → subjective TSS
+  return {
+    tssFinal: calculateTssSubjective(durationMin, rpe),
+    tssVersion: 'v1_rpe',
+    sessionType: 'legacy',
+  };
 }
 
 export function getHRVBaseline7d(date: string, dailyChecks: DailyCheck[]): number {
