@@ -204,7 +204,9 @@ export default function Workout() {
               <Input
                 id="duration"
                 type="number"
-                placeholder="Ex: 45"
+                step="0.01"
+                min="0.01"
+                placeholder="Ex: 45.50"
                 value={duration || ''}
                 onChange={(e) => setDuration(Number(e.target.value) || undefined)}
                 className="text-lg"
