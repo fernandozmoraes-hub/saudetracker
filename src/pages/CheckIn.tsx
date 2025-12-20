@@ -149,8 +149,13 @@ export default function CheckIn() {
               id="hrv"
               type="number"
               placeholder="Ex: 45"
+              min={1}
+              max={300}
               value={formData.hrv || ''}
-              onChange={(e) => setFormData({ ...formData, hrv: Number(e.target.value) || undefined })}
+              onChange={(e) => {
+                const val = Number(e.target.value);
+                setFormData({ ...formData, hrv: val > 0 ? val : undefined });
+              }}
               className="text-lg"
             />
           </div>
