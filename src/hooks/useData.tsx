@@ -71,6 +71,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         validated: row.validated,
         distanceKm: row.distance_km ? Number(row.distance_km) : undefined,
         avgHr: row.avg_hr ?? undefined,
+        muscleGroups: (row as any).muscle_groups ?? undefined,
       }));
       setWorkouts(workoutsArr);
     } catch (error) {
@@ -115,26 +116,52 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const saveWorkoutFn = async (workout: Workout): Promise<boolean> => {
     if (!user) return false;
 
-    const { error } = await supabase
-      .from('workouts')
-      .upsert({
-        id: workout.id,
-        user_id: user.id,
-        date: workout.date,
-        type: workout.type,
-        duration_min: workout.durationMin,
-        rpe: workout.rpe,
-        tss_subjective: workout.tssSubjective,
-        validated: workout.validated,
-        distance_km: workout.distanceKm ?? null,
-        avg_hr: workout.avgHr ?? null,
-      }, {
-        onConflict: 'id',
-      });
+    // Check if it's a new workout (no valid UUID id)
+    const isNewWorkout = !workout.id || workout.id === '' || !workout.id.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
 
-    if (error) {
-      console.error('Error saving workout:', error);
-      return false;
+    if (isNewWorkout) {
+      // Insert new workout - let Supabase generate the UUID
+      const { error } = await supabase
+        .from('workouts')
+        .insert({
+          user_id: user.id,
+          date: workout.date,
+          type: workout.type,
+          duration_min: workout.durationMin,
+          rpe: workout.rpe,
+          tss_subjective: workout.tssSubjective,
+          validated: workout.validated,
+          distance_km: workout.distanceKm ?? null,
+          avg_hr: workout.avgHr ?? null,
+          muscle_groups: workout.muscleGroups ?? null,
+        });
+
+      if (error) {
+        console.error('Error saving workout:', error);
+        return false;
+      }
+    } else {
+      // Update existing workout
+      const { error } = await supabase
+        .from('workouts')
+        .update({
+          date: workout.date,
+          type: workout.type,
+          duration_min: workout.durationMin,
+          rpe: workout.rpe,
+          tss_subjective: workout.tssSubjective,
+          validated: workout.validated,
+          distance_km: workout.distanceKm ?? null,
+          avg_hr: workout.avgHr ?? null,
+          muscle_groups: workout.muscleGroups ?? null,
+        })
+        .eq('id', workout.id)
+        .eq('user_id', user.id);
+
+      if (error) {
+        console.error('Error updating workout:', error);
+        return false;
+      }
     }
 
     await fetchData();

@@ -21,6 +21,7 @@ export interface Workout {
   validated: boolean; // for strength training
   distanceKm?: number; // km, for Run/Bike
   avgHr?: number; // bpm, for Run/Bike
+  muscleGroups?: string[]; // for Strength training
 }
 
 export type HRVStatus = 'OK' | 'Alert' | 'Critical';
