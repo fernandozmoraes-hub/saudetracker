@@ -110,12 +110,16 @@ export async function getWorkouts(): Promise<Workout[]> {
     id: row.id,
     date: row.date,
     type: row.type as Workout['type'],
-    durationMin: row.duration_min,
+    sessionType: ((row as any).session_type ?? 'legacy') as Workout['sessionType'],
+    tssVersion: ((row as any).tss_version ?? 'v1_rpe') as Workout['tssVersion'],
+    durationMin: Number(row.duration_min),
     rpe: row.rpe,
     tssSubjective: row.tss_subjective,
+    tssFinal: Number((row as any).tss_final ?? row.tss_subjective),
     validated: row.validated,
     distanceKm: row.distance_km ? Number(row.distance_km) : undefined,
     avgHr: row.avg_hr ?? undefined,
+    lthrUsed: (row as any).lthr_used ?? undefined,
   }));
 }
 
@@ -168,12 +172,16 @@ export async function getWorkoutsByDate(date: string): Promise<Workout[]> {
     id: row.id,
     date: row.date,
     type: row.type as Workout['type'],
-    durationMin: row.duration_min,
+    sessionType: ((row as any).session_type ?? 'legacy') as Workout['sessionType'],
+    tssVersion: ((row as any).tss_version ?? 'v1_rpe') as Workout['tssVersion'],
+    durationMin: Number(row.duration_min),
     rpe: row.rpe,
     tssSubjective: row.tss_subjective,
+    tssFinal: Number((row as any).tss_final ?? row.tss_subjective),
     validated: row.validated,
     distanceKm: row.distance_km ? Number(row.distance_km) : undefined,
     avgHr: row.avg_hr ?? undefined,
+    lthrUsed: (row as any).lthr_used ?? undefined,
   }));
 }
 

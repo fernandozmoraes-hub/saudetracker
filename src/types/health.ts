@@ -11,17 +11,32 @@ export interface DailyCheck {
 
 export type WorkoutType = 'Run' | 'Strength' | 'Bike' | 'Rest';
 
+// Novos tipos para modelo híbrido TSS v2
+export type SessionType = 'endurance' | 'strength' | 'legacy';
+export type TssVersion = 'v1_rpe' | 'v2_hybrid';
+
 export interface Workout {
   id: string;
   date: string; // ISO date string
   type: WorkoutType;
+  sessionType: SessionType; // NOVO - tipo de sessão para cálculo
+  tssVersion: TssVersion; // NOVO - versão do modelo de cálculo
   durationMin: number;
   rpe: number; // 0-10
-  tssSubjective: number; // calculated: (duration × rpe) / 10
+  tssSubjective: number; // mantido para compatibilidade
+  tssFinal: number; // NOVO - valor imutável usado para CTL/ATL/TSB
   validated: boolean; // for strength training
   distanceKm?: number; // km, for Run/Bike
   avgHr?: number; // bpm, for Run/Bike
+  lthrUsed?: number; // NOVO - LTHR usado no cálculo (auditoria)
   muscleGroups?: string[]; // for Strength training
+}
+
+// Configurações do usuário
+export interface UserSettings {
+  id?: string;
+  userId?: string;
+  lthr: number; // FC de limiar (padrão: 165 bpm)
 }
 
 export type HRVStatus = 'OK' | 'Alert' | 'Critical';

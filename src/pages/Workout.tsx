@@ -82,13 +82,26 @@ export default function Workout() {
       return;
     }
     
+    // Determinar sessionType baseado no tipo de treino
+    const sessionType = (selectedType === 'Run' || selectedType === 'Bike') 
+      ? 'endurance' 
+      : selectedType === 'Strength' 
+        ? 'strength' 
+        : 'legacy';
+    
+    // Por enquanto, usar v1_rpe para manter compatibilidade (Fase 3 implementará v2_hybrid)
+    const tssFinalValue = selectedType === 'Rest' ? 0 : tssSubjective;
+    
     const workout: WorkoutType = {
       id: '', // Empty string - Supabase will generate UUID
       date: dateString,
       type: selectedType,
+      sessionType: sessionType as WorkoutType['sessionType'],
+      tssVersion: 'v1_rpe', // Será atualizado para v2_hybrid na Fase 3
       durationMin: selectedType === 'Rest' ? 0 : (duration || 0),
       rpe: selectedType === 'Rest' ? 0 : rpe,
       tssSubjective: selectedType === 'Rest' ? 0 : tssSubjective,
+      tssFinal: tssFinalValue,
       validated: selectedType === 'Strength' ? validated : true,
       distanceKm: (selectedType === 'Run' || selectedType === 'Bike') ? distance : undefined,
       avgHr: (selectedType === 'Run' || selectedType === 'Bike') ? avgHr : undefined,

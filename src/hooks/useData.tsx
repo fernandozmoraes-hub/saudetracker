@@ -65,12 +65,16 @@ export function DataProvider({ children }: { children: ReactNode }) {
         id: row.id,
         date: row.date,
         type: row.type as Workout['type'],
-        durationMin: row.duration_min,
+        sessionType: ((row as any).session_type ?? 'legacy') as Workout['sessionType'],
+        tssVersion: ((row as any).tss_version ?? 'v1_rpe') as Workout['tssVersion'],
+        durationMin: Number(row.duration_min),
         rpe: row.rpe,
         tssSubjective: row.tss_subjective,
+        tssFinal: Number((row as any).tss_final ?? row.tss_subjective),
         validated: row.validated,
         distanceKm: row.distance_km ? Number(row.distance_km) : undefined,
         avgHr: row.avg_hr ?? undefined,
+        lthrUsed: (row as any).lthr_used ?? undefined,
         muscleGroups: (row as any).muscle_groups ?? undefined,
       }));
       setWorkouts(workoutsArr);
@@ -127,12 +131,16 @@ export function DataProvider({ children }: { children: ReactNode }) {
           user_id: user.id,
           date: workout.date,
           type: workout.type,
+          session_type: workout.sessionType,
+          tss_version: workout.tssVersion,
           duration_min: workout.durationMin,
           rpe: workout.rpe,
           tss_subjective: workout.tssSubjective,
+          tss_final: workout.tssFinal,
           validated: workout.validated,
           distance_km: workout.distanceKm ?? null,
           avg_hr: workout.avgHr ?? null,
+          lthr_used: workout.lthrUsed ?? null,
           muscle_groups: workout.muscleGroups ?? null,
         });
 
@@ -147,12 +155,16 @@ export function DataProvider({ children }: { children: ReactNode }) {
         .update({
           date: workout.date,
           type: workout.type,
+          session_type: workout.sessionType,
+          tss_version: workout.tssVersion,
           duration_min: workout.durationMin,
           rpe: workout.rpe,
           tss_subjective: workout.tssSubjective,
+          tss_final: workout.tssFinal,
           validated: workout.validated,
           distance_km: workout.distanceKm ?? null,
           avg_hr: workout.avgHr ?? null,
+          lthr_used: workout.lthrUsed ?? null,
           muscle_groups: workout.muscleGroups ?? null,
         })
         .eq('id', workout.id)

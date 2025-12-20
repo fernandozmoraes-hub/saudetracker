@@ -59,6 +59,30 @@ export type Database = {
         }
         Relationships: []
       }
+      user_settings: {
+        Row: {
+          created_at: string | null
+          id: string
+          lthr: number | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          lthr?: number | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          lthr?: number | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       workouts: {
         Row: {
           avg_hr: number | null
@@ -67,9 +91,13 @@ export type Database = {
           distance_km: number | null
           duration_min: number
           id: string
+          lthr_used: number | null
           muscle_groups: string[] | null
           rpe: number
+          session_type: string | null
+          tss_final: number | null
           tss_subjective: number
+          tss_version: string | null
           type: string
           user_id: string
           validated: boolean
@@ -81,9 +109,13 @@ export type Database = {
           distance_km?: number | null
           duration_min?: number
           id?: string
+          lthr_used?: number | null
           muscle_groups?: string[] | null
           rpe?: number
+          session_type?: string | null
+          tss_final?: number | null
           tss_subjective?: number
+          tss_version?: string | null
           type: string
           user_id: string
           validated?: boolean
@@ -95,9 +127,13 @@ export type Database = {
           distance_km?: number | null
           duration_min?: number
           id?: string
+          lthr_used?: number | null
           muscle_groups?: string[] | null
           rpe?: number
+          session_type?: string | null
+          tss_final?: number | null
           tss_subjective?: number
+          tss_version?: string | null
           type?: string
           user_id?: string
           validated?: boolean
