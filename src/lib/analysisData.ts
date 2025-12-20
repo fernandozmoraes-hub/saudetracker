@@ -21,8 +21,8 @@ export function buildAnalysisData(dailyChecks: DailyCheck[], workouts: Workout[]
     };
   }
   
-  const atl = calculateATL(today, dailyChecks, workouts);
-  const ctl = calculateCTL(today, dailyChecks, workouts);
+  const atl = calculateATL(today, workouts);
+  const ctl = calculateCTL(today, workouts);
   const tsb = ctl - atl;
   const baseline = getHRVBaseline7d(today, dailyChecks);
   
@@ -54,7 +54,7 @@ export function buildAnalysisData(dailyChecks: DailyCheck[], workouts: Workout[]
   const atlValues: number[] = [];
   for (let i = 0; i < 5; i++) {
     const checkDate = format(subDays(new Date(), i), 'yyyy-MM-dd');
-    atlValues.push(calculateATL(checkDate, dailyChecks, workouts));
+    atlValues.push(calculateATL(checkDate, workouts));
   }
   
   let atlTrend5d: 'increasing' | 'stable' | 'decreasing' = 'stable';
