@@ -229,24 +229,24 @@ export default function Workout() {
                 </Label>
                 <div className="grid grid-cols-2 gap-2">
                   {muscleGroupOptions.map((group) => (
-                    <div
+                    <label
                       key={group.id}
+                      htmlFor={group.id}
                       className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all duration-200 ${
                         muscleGroups.includes(group.id)
                           ? 'bg-primary/10 border-primary'
                           : 'bg-secondary border-border hover:border-primary/50'
                       }`}
-                      onClick={() => toggleMuscleGroup(group.id)}
                     >
                       <Checkbox
                         id={group.id}
                         checked={muscleGroups.includes(group.id)}
                         onCheckedChange={() => toggleMuscleGroup(group.id)}
                       />
-                      <label htmlFor={group.id} className="text-sm font-medium cursor-pointer">
+                      <span className="text-sm font-medium">
                         {group.label}
-                      </label>
-                    </div>
+                      </span>
+                    </label>
                   ))}
                 </div>
               </div>
