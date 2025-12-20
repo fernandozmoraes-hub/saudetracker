@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useData } from '@/hooks/useData';
 import { calculateTssSubjective, getHRVMetrics } from '@/lib/calculations';
 import { Workout as WorkoutType, WorkoutType as WorkoutTypeEnum } from '@/types/health';
@@ -19,6 +20,19 @@ const workoutTypes: { type: WorkoutTypeEnum; label: string; icon: React.ReactNod
   { type: 'Rest', label: 'Descanso', icon: <Timer className="w-5 h-5" /> },
 ];
 
+const muscleGroupOptions = [
+  { id: 'chest', label: 'Peito' },
+  { id: 'back', label: 'Costas' },
+  { id: 'shoulders', label: 'Ombros' },
+  { id: 'biceps', label: 'Bíceps' },
+  { id: 'triceps', label: 'Tríceps' },
+  { id: 'core', label: 'Core' },
+  { id: 'quads', label: 'Quadríceps' },
+  { id: 'hamstrings', label: 'Posteriores' },
+  { id: 'glutes', label: 'Glúteos' },
+  { id: 'calves', label: 'Panturrilha' },
+];
+
 export default function Workout() {
   const today = format(new Date(), 'yyyy-MM-dd');
   const { toast } = useToast();
@@ -30,10 +44,19 @@ export default function Workout() {
   const [validated, setValidated] = useState(false);
   const [distance, setDistance] = useState<number | undefined>();
   const [avgHr, setAvgHr] = useState<number | undefined>();
+  const [muscleGroups, setMuscleGroups] = useState<string[]>([]);
   
   const tssSubjective = duration && rpe ? calculateTssSubjective(duration, rpe) : 0;
   const hrvMetrics = getHRVMetrics(today, dailyChecks);
   const tssEffective = Math.round(tssSubjective * (hrvMetrics?.factor ?? 1.0));
+
+  const toggleMuscleGroup = (groupId: string) => {
+    setMuscleGroups(prev => 
+      prev.includes(groupId) 
+        ? prev.filter(g => g !== groupId)
+        : [...prev, groupId]
+    );
+  };
   
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -57,7 +80,7 @@ export default function Workout() {
     }
     
     const workout: WorkoutType = {
-      id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      id: '', // Empty string - Supabase will generate UUID
       date: today,
       type: selectedType,
       durationMin: selectedType === 'Rest' ? 0 : (duration || 0),
@@ -66,6 +89,7 @@ export default function Workout() {
       validated: selectedType === 'Strength' ? validated : true,
       distanceKm: (selectedType === 'Run' || selectedType === 'Bike') ? distance : undefined,
       avgHr: (selectedType === 'Run' || selectedType === 'Bike') ? avgHr : undefined,
+      muscleGroups: selectedType === 'Strength' && muscleGroups.length > 0 ? muscleGroups : undefined,
     };
     
     const success = await saveWorkout(workout);
@@ -83,6 +107,7 @@ export default function Workout() {
       setValidated(false);
       setDistance(undefined);
       setAvgHr(undefined);
+      setMuscleGroups([]);
     } else {
       toast({
         title: 'Erro ao salvar',
@@ -93,6 +118,10 @@ export default function Workout() {
   };
   
   const todayWorkouts = workouts.filter(w => w.date === today);
+
+  const getMuscleGroupLabel = (id: string) => {
+    return muscleGroupOptions.find(m => m.id === id)?.label || id;
+  };
   
   return (
     <PageContainer 
@@ -110,6 +139,7 @@ export default function Workout() {
                   {w.durationMin}min
                   {(w.type === 'Run' || w.type === 'Bike') && w.distanceKm && ` • ${w.distanceKm}km`}
                   {(w.type === 'Run' || w.type === 'Bike') && w.avgHr && ` • FC ${w.avgHr}`}
+                  {w.type === 'Strength' && w.muscleGroups && w.muscleGroups.length > 0 && ` • ${w.muscleGroups.map(getMuscleGroupLabel).join(', ')}`}
                   {' '}• RPE {w.rpe} • TSS {w.tssSubjective}
                 </span>
               </div>
@@ -187,6 +217,37 @@ export default function Workout() {
                     onChange={(e) => setAvgHr(Number(e.target.value) || undefined)}
                     className="text-lg"
                   />
+                </div>
+              </div>
+            )}
+
+            {selectedType === 'Strength' && (
+              <div className="space-y-3 animate-slide-up">
+                <Label className="flex items-center gap-2">
+                  <Dumbbell className="w-4 h-4 text-primary" />
+                  Grupos Musculares
+                </Label>
+                <div className="grid grid-cols-2 gap-2">
+                  {muscleGroupOptions.map((group) => (
+                    <div
+                      key={group.id}
+                      className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all duration-200 ${
+                        muscleGroups.includes(group.id)
+                          ? 'bg-primary/10 border-primary'
+                          : 'bg-secondary border-border hover:border-primary/50'
+                      }`}
+                      onClick={() => toggleMuscleGroup(group.id)}
+                    >
+                      <Checkbox
+                        id={group.id}
+                        checked={muscleGroups.includes(group.id)}
+                        onCheckedChange={() => toggleMuscleGroup(group.id)}
+                      />
+                      <label htmlFor={group.id} className="text-sm font-medium cursor-pointer">
+                        {group.label}
+                      </label>
+                    </div>
+                  ))}
                 </div>
               </div>
             )}

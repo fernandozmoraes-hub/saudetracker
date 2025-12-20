@@ -11,7 +11,7 @@ const WorkoutSchema = z.object({
   date: z.string().max(20),
   type: z.string().max(50),
   durationMin: z.number().min(0).max(1440),
-  rpe: z.number().min(1).max(10),
+  rpe: z.number().min(0).max(10),
   tssSubjective: z.number().min(0).max(500),
 });
 

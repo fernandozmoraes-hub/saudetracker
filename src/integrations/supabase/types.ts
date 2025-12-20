@@ -67,6 +67,7 @@ export type Database = {
           distance_km: number | null
           duration_min: number
           id: string
+          muscle_groups: string[] | null
           rpe: number
           tss_subjective: number
           type: string
@@ -80,6 +81,7 @@ export type Database = {
           distance_km?: number | null
           duration_min?: number
           id?: string
+          muscle_groups?: string[] | null
           rpe?: number
           tss_subjective?: number
           type: string
@@ -93,6 +95,7 @@ export type Database = {
           distance_km?: number | null
           duration_min?: number
           id?: string
+          muscle_groups?: string[] | null
           rpe?: number
           tss_subjective?: number
           type?: string
