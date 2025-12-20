@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useUserSettings } from '@/hooks/useUserSettings';
 import { useToast } from '@/hooks/use-toast';
-import { Heart, Save, Info, Loader2 } from 'lucide-react';
+import { Heart, Save, Info, Loader2, Activity, Dumbbell } from 'lucide-react';
 import { DEFAULT_LTHR } from '@/lib/calculations';
 
 export default function Settings() {
@@ -103,6 +103,43 @@ export default function Settings() {
           )}
           Salvar
         </Button>
+      </div>
+
+      {/* Active Model Banner */}
+      <div className="gradient-card rounded-xl p-5 border border-primary/30 animate-slide-up">
+        <div className="flex items-center gap-2 mb-3">
+          <Activity className="w-5 h-5 text-primary" />
+          <h3 className="font-display font-semibold">Modelo de Carga Ativo</h3>
+          <span className="ml-auto text-xs px-2 py-0.5 rounded-full bg-primary/20 text-primary">v2 Híbrido</span>
+        </div>
+        
+        <div className="flex flex-col sm:flex-row gap-3 mb-4">
+          <div className="flex items-center gap-2 p-3 rounded-lg bg-secondary/70 flex-1">
+            <Heart className="w-4 h-4 text-primary" />
+            <div>
+              <p className="text-sm font-medium">Endurance</p>
+              <p className="text-xs text-muted-foreground">via FC (HR-TSS)</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 p-3 rounded-lg bg-secondary/70 flex-1">
+            <Dumbbell className="w-4 h-4 text-primary" />
+            <div>
+              <p className="text-sm font-medium">Força</p>
+              <p className="text-xs text-muted-foreground">via RPE (RPE-TSS)</p>
+            </div>
+          </div>
+        </div>
+        
+        <div className="text-sm text-muted-foreground space-y-2">
+          <p>
+            <strong>Modelo Híbrido v2:</strong> Combina a precisão do HR-TSS para treinos de endurance 
+            (corrida, bike) com o RPE-TSS para treinos de força.
+          </p>
+          <p>
+            O HR-TSS utiliza sua FC média e LTHR para calcular a carga de forma mais precisa. 
+            O RPE-TSS aplica um fator de validação (×0.7 se não completou todos os sets).
+          </p>
+        </div>
       </div>
 
       {/* Info Card */}

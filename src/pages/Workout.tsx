@@ -180,13 +180,26 @@ export default function Workout() {
             {selectedDateWorkouts.map((w) => (
               <div key={w.id} className="flex items-center justify-between text-sm">
                 <span className="font-medium">{w.type}</span>
-                <span className="text-muted-foreground">
-                  {w.durationMin}min
-                  {(w.type === 'Run' || w.type === 'Bike') && w.distanceKm && ` • ${w.distanceKm}km`}
-                  {(w.type === 'Run' || w.type === 'Bike') && w.avgHr && ` • FC ${w.avgHr}`}
-                  {w.type === 'Strength' && w.muscleGroups && w.muscleGroups.length > 0 && ` • ${w.muscleGroups.map(getMuscleGroupLabel).join(', ')}`}
-                  {' '}• RPE {w.rpe} • TSS {w.tssSubjective}
-                </span>
+                <div className="text-right text-muted-foreground">
+                  <span>
+                    {w.durationMin}min
+                    {(w.type === 'Run' || w.type === 'Bike') && w.distanceKm && ` • ${w.distanceKm}km`}
+                    {(w.type === 'Run' || w.type === 'Bike') && w.avgHr && ` • FC ${w.avgHr}`}
+                    {w.type === 'Strength' && w.muscleGroups && w.muscleGroups.length > 0 && ` • ${w.muscleGroups.map(getMuscleGroupLabel).join(', ')}`}
+                  </span>
+                  <div className="flex items-center justify-end gap-1.5 mt-0.5">
+                    <span className="font-medium text-foreground">
+                      TSS: {w.tssFinal ?? w.tssSubjective}
+                    </span>
+                    <span className={`text-xs px-1.5 py-0.5 rounded ${
+                      w.tssVersion === 'v2_hybrid' 
+                        ? 'bg-primary/20 text-primary' 
+                        : 'bg-secondary text-muted-foreground'
+                    }`}>
+                      {w.tssVersion === 'v2_hybrid' ? 'v2 (HR-TSS)' : 'v1 (RPE)'}
+                    </span>
+                  </div>
+                </div>
               </div>
             ))}
           </div>
