@@ -13,6 +13,10 @@ const WorkoutSchema = z.object({
   durationMin: z.number().min(0).max(1440),
   rpe: z.number().min(0).max(10),
   tssSubjective: z.number().min(0).max(500),
+  tssFinal: z.number().min(0).max(500).optional().nullable(),
+  tssVersion: z.string().max(20).optional().nullable(),
+  sessionType: z.string().max(20).optional().nullable(),
+  avgHr: z.number().min(0).max(250).optional().nullable(),
 });
 
 const TodayDataSchema = z.object({
@@ -58,6 +62,12 @@ const RequestBodySchema = z.object({
 
 const SYSTEM_PROMPT = `Você é um treinador experiente em atletas master (50+), especializado em saúde, longevidade e progressão sustentável.
 
+MODELO DE CARGA HÍBRIDO (v2):
+O sistema utiliza um modelo híbrido para calcular TSS (Training Stress Score):
+- **Endurance (Corrida, Bike)**: TSS calculado via HR-TSS quando FC média está disponível, usando a fórmula baseada no LTHR (limiar de lactato) do atleta. Caso contrário, usa RPE-TSS.
+- **Força (Musculação)**: TSS calculado via RPE-TSS com fator de validação (×0.7 se o atleta não completou todos os sets planejados).
+- O HRV NÃO é usado para modificar a carga de treino. O HRV serve apenas como indicador de recuperação e status fisiológico.
+
 IMPORTANTE - REGRAS OBRIGATÓRIAS:
 - Você NÃO deve classificar risco
 - Você NÃO deve usar termos como "Alto Risco", "Seguro", "Atenção", "🟢", "🟡", "🔴"
@@ -67,11 +77,13 @@ IMPORTANTE - REGRAS OBRIGATÓRIAS:
 - Nunca use emojis de cores/risco
 
 Seu papel é APENAS:
-- Interpretar HRV, sono, FC de repouso e carga (TSS, ATL, CTL, TSB)
+- Interpretar HRV, sono, FC de repouso como indicadores de recuperação (não de carga)
+- Analisar carga de treino (TSS, ATL, CTL, TSB) considerando o modelo híbrido
 - Explicar o contexto fisiológico do dia baseado no status recebido
 - Apontar pontos positivos e pontos de atenção nos dados
 - Sugerir foco geral (ex: recuperação, manutenção, cautela)
 - Comentar decisões acertadas ou sinais que merecem observação
+- Se houver treinos com HR-TSS (v2_hybrid), comentar a precisão adicional da medição
 
 Formato da resposta:
 - 1 parágrafo curto (3–5 linhas)
@@ -156,10 +168,21 @@ ${analysisData.today.mood ? `- Humor: ${analysisData.today.mood}/5` : ''}
 - Dias consecutivos com sono < 6h: ${analysisData.trends.consecutiveLowSleepDays}
 - Tendência ATL 5d: ${analysisData.trends.atlTrend5d}
 
-**Treinos recentes (últimos 7 dias):**
+**Treinos recentes (últimos 7 dias) - Modelo Híbrido v2:**
 ${analysisData.recentWorkouts.length > 0 
-  ? analysisData.recentWorkouts.map((w: any) => `- ${w.date}: ${w.type}, ${w.durationMin}min, RPE ${w.rpe}, TSS ${w.tssSubjective}`).join('\n')
+  ? analysisData.recentWorkouts.map((w: any) => {
+      const tss = w.tssFinal ?? w.tssSubjective;
+      const version = w.tssVersion === 'v2_hybrid' ? 'HR-TSS' : 'RPE-TSS';
+      const hrInfo = w.avgHr ? `, FC ${w.avgHr}bpm` : '';
+      return `- ${w.date}: ${w.type}, ${w.durationMin}min, RPE ${w.rpe}${hrInfo}, TSS ${tss} (${version})`;
+    }).join('\n')
   : '- Nenhum treino registrado'}
+
+**Nota sobre o modelo de carga:**
+- TSS de endurance com FC: calculado via HR-TSS (mais preciso)
+- TSS de endurance sem FC: calculado via RPE-TSS
+- TSS de força: calculado via RPE-TSS com fator de validação
+- HRV é usado apenas como indicador de recuperação, não modifica a carga
 
 Forneça sua análise contextual, explicando os dados sem reclassificar o status.`;
 
