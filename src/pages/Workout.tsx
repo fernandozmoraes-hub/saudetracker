@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { format } from 'date-fns';
+import { format, isToday } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { Button } from '@/components/ui/button';
@@ -7,11 +7,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useData } from '@/hooks/useData';
 import { calculateTssSubjective, getHRVMetrics } from '@/lib/calculations';
 import { Workout as WorkoutType, WorkoutType as WorkoutTypeEnum } from '@/types/health';
 import { useToast } from '@/hooks/use-toast';
-import { Dumbbell, Bike, Timer, Activity, Check, MapPin, Heart } from 'lucide-react';
+import { Dumbbell, Bike, Timer, Activity, Check, MapPin, Heart, CalendarIcon } from 'lucide-react';
 
 const workoutTypes: { type: WorkoutTypeEnum; label: string; icon: React.ReactNode }[] = [
   { type: 'Run', label: 'Corrida', icon: <Activity className="w-5 h-5" /> },
@@ -34,10 +36,10 @@ const muscleGroupOptions = [
 ];
 
 export default function Workout() {
-  const today = format(new Date(), 'yyyy-MM-dd');
   const { toast } = useToast();
   const { dailyChecks, workouts, saveWorkout } = useData();
   
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [selectedType, setSelectedType] = useState<WorkoutTypeEnum | null>(null);
   const [duration, setDuration] = useState<number | undefined>();
   const [rpe, setRpe] = useState<number>(5);
@@ -46,8 +48,9 @@ export default function Workout() {
   const [avgHr, setAvgHr] = useState<number | undefined>();
   const [muscleGroups, setMuscleGroups] = useState<string[]>([]);
   
+  const dateString = format(selectedDate, 'yyyy-MM-dd');
   const tssSubjective = duration && rpe ? calculateTssSubjective(duration, rpe) : 0;
-  const hrvMetrics = getHRVMetrics(today, dailyChecks);
+  const hrvMetrics = getHRVMetrics(dateString, dailyChecks);
   const tssEffective = Math.round(tssSubjective * (hrvMetrics?.factor ?? 1.0));
 
   const toggleMuscleGroup = (groupId: string) => {
@@ -81,7 +84,7 @@ export default function Workout() {
     
     const workout: WorkoutType = {
       id: '', // Empty string - Supabase will generate UUID
-      date: today,
+      date: dateString,
       type: selectedType,
       durationMin: selectedType === 'Rest' ? 0 : (duration || 0),
       rpe: selectedType === 'Rest' ? 0 : rpe,
@@ -117,7 +120,7 @@ export default function Workout() {
     }
   };
   
-  const todayWorkouts = workouts.filter(w => w.date === today);
+  const selectedDateWorkouts = workouts.filter(w => w.date === dateString);
 
   const getMuscleGroupLabel = (id: string) => {
     return muscleGroupOptions.find(m => m.id === id)?.label || id;
@@ -126,13 +129,34 @@ export default function Workout() {
   return (
     <PageContainer 
       title="Registrar Treino" 
-      subtitle={format(new Date(), "EEEE, d 'de' MMMM", { locale: ptBR })}
+      subtitle={
+        <Popover>
+          <PopoverTrigger asChild>
+            <button className="flex items-center gap-2 text-muted-foreground hover:text-primary transition-colors">
+              <CalendarIcon className="w-4 h-4" />
+              {format(selectedDate, "EEEE, d 'de' MMMM", { locale: ptBR })}
+            </button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0" align="start">
+            <Calendar
+              mode="single"
+              selected={selectedDate}
+              onSelect={(date) => date && setSelectedDate(date)}
+              disabled={(date) => date > new Date()}
+              initialFocus
+              className="pointer-events-auto"
+            />
+          </PopoverContent>
+        </Popover>
+      }
     >
-      {todayWorkouts.length > 0 && (
+      {selectedDateWorkouts.length > 0 && (
         <div className="gradient-card rounded-xl p-4 border border-border/50 mb-4">
-          <p className="text-sm text-muted-foreground mb-2">Treinos de hoje</p>
+          <p className="text-sm text-muted-foreground mb-2">
+            {isToday(selectedDate) ? 'Treinos de hoje' : `Treinos de ${format(selectedDate, "d 'de' MMMM", { locale: ptBR })}`}
+          </p>
           <div className="space-y-2">
-            {todayWorkouts.map((w) => (
+            {selectedDateWorkouts.map((w) => (
               <div key={w.id} className="flex items-center justify-between text-sm">
                 <span className="font-medium">{w.type}</span>
                 <span className="text-muted-foreground">
