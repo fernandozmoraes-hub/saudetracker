@@ -7,7 +7,7 @@ import { getTodayMetrics } from '@/lib/calculations';
 import { useData } from '@/hooks/useData';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Heart, TrendingUp, TrendingDown, Activity, AlertTriangle, CheckCircle, PauseCircle, Loader2 } from 'lucide-react';
+import { Heart, TrendingUp, TrendingDown, Activity, AlertTriangle, CheckCircle, PauseCircle, Loader2, Dumbbell } from 'lucide-react';
 
 const recommendationConfig = {
   maintain: {
@@ -147,6 +147,22 @@ export default function Today() {
                 : 'text-status-ok'
           }
         />
+      </div>
+      
+      {/* Active Model Banner */}
+      <div className="flex items-center justify-between p-3 rounded-lg bg-secondary/70 border border-border/40 animate-slide-up">
+        <div className="flex items-center gap-2">
+          <Activity className="w-4 h-4 text-primary" />
+          <span className="text-sm font-medium">Modelo de carga ativo</span>
+        </div>
+        <div className="flex items-center gap-3 text-xs text-muted-foreground">
+          <span className="flex items-center gap-1">
+            <Heart className="w-3 h-3" /> Endurance via FC
+          </span>
+          <span className="flex items-center gap-1">
+            <Dumbbell className="w-3 h-3" /> Força via RPE
+          </span>
+        </div>
       </div>
       
       {/* Quick explanation */}
