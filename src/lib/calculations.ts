@@ -134,7 +134,8 @@ export function getHRVBaseline7d(date: string, dailyChecks: DailyCheck[]): numbe
   for (let i = 1; i <= 7; i++) {
     const checkDate = format(subDays(targetDate, i), 'yyyy-MM-dd');
     const check = dailyChecks.find(c => c.date === checkDate);
-    if (check?.hrv) {
+    // Filtrar apenas valores de HRV válidos (> 0)
+    if (check?.hrv && check.hrv > 0) {
       last7Days.push(check.hrv);
     }
   }

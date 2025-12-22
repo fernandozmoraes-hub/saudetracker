@@ -36,7 +36,7 @@ const TrainingLoadSchema = z.object({
 });
 
 const TrendsSchema = z.object({
-  hrvBaseline7d: z.number().min(0).max(300),
+  hrvBaseline7d: z.number().min(-300).max(300), // Aceita negativos para dados legados
   hrvVsBaseline: z.number().min(-100).max(100),
   consecutiveCriticalDays: z.number().min(0).max(365),
   consecutiveLowSleepDays: z.number().min(0).max(365),
