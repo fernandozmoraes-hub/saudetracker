@@ -13,6 +13,7 @@ import Auth from "./pages/Auth";
 import CheckIn from "./pages/CheckIn";
 import Workout from "./pages/Workout";
 import Week from "./pages/Week";
+import Calendar from "./pages/Calendar";
 import History from "./pages/History";
 import Settings from "./pages/Settings";
 import Install from "./pages/Install";
@@ -36,6 +37,7 @@ const App = () => (
                   <Route path="/checkin" element={<ProtectedRoute><CheckIn /></ProtectedRoute>} />
                   <Route path="/workout" element={<ProtectedRoute><Workout /></ProtectedRoute>} />
                   <Route path="/week" element={<ProtectedRoute><Week /></ProtectedRoute>} />
+                  <Route path="/calendar" element={<ProtectedRoute><Calendar /></ProtectedRoute>} />
                   <Route path="/history" element={<ProtectedRoute><History /></ProtectedRoute>} />
                   <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
                   <Route path="/install" element={<Install />} />
