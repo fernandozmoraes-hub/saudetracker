@@ -14,22 +14,30 @@ export type WorkoutType = 'Run' | 'Strength' | 'Bike' | 'Rest';
 // Novos tipos para modelo híbrido TSS v2
 export type SessionType = 'endurance' | 'strength' | 'legacy';
 export type TssVersion = 'v1_rpe' | 'v2_hybrid';
+export type TssMethod = 'HR_avg' | 'HR_zones' | 'RPE';
 
 export interface Workout {
   id: string;
   date: string; // ISO date string
   type: WorkoutType;
-  sessionType: SessionType; // NOVO - tipo de sessão para cálculo
-  tssVersion: TssVersion; // NOVO - versão do modelo de cálculo
+  sessionType: SessionType; // tipo de sessão para cálculo
+  tssVersion: TssVersion; // versão do modelo de cálculo
   durationMin: number;
   rpe: number; // 0-10
   tssSubjective: number; // mantido para compatibilidade
-  tssFinal: number; // NOVO - valor imutável usado para CTL/ATL/TSB
+  tssFinal: number; // valor imutável usado para CTL/ATL/TSB
   validated: boolean; // for strength training
   distanceKm?: number; // km, for Run/Bike
   avgHr?: number; // bpm, for Run/Bike
-  lthrUsed?: number; // NOVO - LTHR usado no cálculo (auditoria)
+  lthrUsed?: number; // LTHR usado no cálculo (auditoria)
   muscleGroups?: string[]; // for Strength training
+  // HR-TSS por zonas (v3)
+  timeZ1Min?: number;
+  timeZ2Min?: number;
+  timeZ3Min?: number;
+  timeZ4Min?: number;
+  timeZ5Min?: number;
+  tssMethod?: TssMethod; // 'HR_avg' (legado), 'HR_zones' (novo), 'RPE' (força)
 }
 
 // Configurações do usuário
@@ -37,6 +45,23 @@ export interface UserSettings {
   id?: string;
   userId?: string;
   lthr: number; // FC de limiar (padrão: 165 bpm)
+  restingHr?: number; // FC de repouso
+  maxHr?: number; // FC máxima
+  // Limites de zona (% do LTHR)
+  zone1UpperPct: number; // padrão 84
+  zone2UpperPct: number; // padrão 89
+  zone3UpperPct: number; // padrão 94
+  zone4UpperPct: number; // padrão 99
+}
+
+// Zonas de FC com pesos TP-like
+export interface HrZone {
+  zone: number;
+  lowerPct: number;
+  upperPct: number;
+  weight: number; // 0.6, 0.8, 1.0, 1.2, 1.4
+  lowerBpm?: number;
+  upperBpm?: number;
 }
 
 export type HRVStatus = 'OK' | 'Alert' | 'Critical';

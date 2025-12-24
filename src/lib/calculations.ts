@@ -1,12 +1,42 @@
-import { DailyCheck, Workout, HRVStatus, HRVMetrics, TodayMetrics, WeeklyLoad, SessionType, TssVersion } from '@/types/health';
+import { DailyCheck, Workout, HRVStatus, HRVMetrics, TodayMetrics, WeeklyLoad, SessionType, TssVersion, TssMethod, HrZone } from '@/types/health';
 import { format, subDays, startOfWeek, endOfWeek, eachDayOfInterval, getISOWeek, getYear } from 'date-fns';
 
 // ============================================================
-// TSS v2 Hybrid Model - Calculation Functions
+// TSS v2/v3 Hybrid Model - Calculation Functions
 // ============================================================
 
 // Default LTHR if user hasn't configured one
 export const DEFAULT_LTHR = 165;
+
+// Default HR zone thresholds (% of LTHR)
+export const DEFAULT_ZONE_THRESHOLDS = {
+  zone1UpperPct: 84,
+  zone2UpperPct: 89,
+  zone3UpperPct: 94,
+  zone4UpperPct: 99,
+};
+
+// Zone weights TP-like
+export const ZONE_WEIGHTS: Record<number, number> = {
+  1: 0.6,
+  2: 0.8,
+  3: 1.0,
+  4: 1.2,
+  5: 1.4,
+};
+
+/**
+ * Get HR zones with calculated bpm values based on LTHR
+ */
+export function getHrZones(lthr: number, zone1Upper: number = 84, zone2Upper: number = 89, zone3Upper: number = 94, zone4Upper: number = 99): HrZone[] {
+  return [
+    { zone: 1, lowerPct: 0, upperPct: zone1Upper, weight: ZONE_WEIGHTS[1], lowerBpm: 0, upperBpm: Math.round(lthr * zone1Upper / 100) },
+    { zone: 2, lowerPct: zone1Upper + 1, upperPct: zone2Upper, weight: ZONE_WEIGHTS[2], lowerBpm: Math.round(lthr * (zone1Upper + 1) / 100), upperBpm: Math.round(lthr * zone2Upper / 100) },
+    { zone: 3, lowerPct: zone2Upper + 1, upperPct: zone3Upper, weight: ZONE_WEIGHTS[3], lowerBpm: Math.round(lthr * (zone2Upper + 1) / 100), upperBpm: Math.round(lthr * zone3Upper / 100) },
+    { zone: 4, lowerPct: zone3Upper + 1, upperPct: zone4Upper, weight: ZONE_WEIGHTS[4], lowerBpm: Math.round(lthr * (zone3Upper + 1) / 100), upperBpm: Math.round(lthr * zone4Upper / 100) },
+    { zone: 5, lowerPct: zone4Upper + 1, upperPct: 120, weight: ZONE_WEIGHTS[5], lowerBpm: Math.round(lthr * (zone4Upper + 1) / 100), upperBpm: Math.round(lthr * 1.2) },
+  ];
+}
 
 /**
  * Calculate RPE-based TSS (legacy and strength)
@@ -39,7 +69,7 @@ export function calculateIntensityFactor(avgHr: number, lthr: number = DEFAULT_L
 }
 
 /**
- * Calculate HR-TSS for endurance activities
+ * Calculate HR-TSS for endurance activities (FC média method)
  * Formula: (duration × IF²) × 100 / 60
  * Simplified: duration × IF² × 1.667
  * Where IF = avgHR / LTHR
@@ -53,6 +83,36 @@ export function calculateHrTss(durationMin: number, avgHr: number, lthr: number 
   const hrTss = (durationMin * intensityFactor * intensityFactor) * 100 / 60;
   
   return Math.round(hrTss);
+}
+
+/**
+ * Calculate HR-TSS based on time per HR zone (TP-like method)
+ * Formula: Σ (hours_in_zone × weight²) × 100
+ * Zone weights: Z1=0.6, Z2=0.8, Z3=1.0, Z4=1.2, Z5=1.4
+ * Used for: Endurance activities when user provides time per zone
+ */
+export function calculateHrTssByZones(
+  timeZ1Min: number = 0,
+  timeZ2Min: number = 0,
+  timeZ3Min: number = 0,
+  timeZ4Min: number = 0,
+  timeZ5Min: number = 0
+): number {
+  const hoursZ1 = timeZ1Min / 60;
+  const hoursZ2 = timeZ2Min / 60;
+  const hoursZ3 = timeZ3Min / 60;
+  const hoursZ4 = timeZ4Min / 60;
+  const hoursZ5 = timeZ5Min / 60;
+
+  const tss = (
+    hoursZ1 * Math.pow(ZONE_WEIGHTS[1], 2) +
+    hoursZ2 * Math.pow(ZONE_WEIGHTS[2], 2) +
+    hoursZ3 * Math.pow(ZONE_WEIGHTS[3], 2) +
+    hoursZ4 * Math.pow(ZONE_WEIGHTS[4], 2) +
+    hoursZ5 * Math.pow(ZONE_WEIGHTS[5], 2)
+  ) * 100;
+
+  return Math.round(tss);
 }
 
 /**
@@ -78,7 +138,16 @@ export interface TssCalculationResult {
   tssFinal: number;
   tssVersion: TssVersion;
   sessionType: SessionType;
+  tssMethod: TssMethod;
   lthrUsed?: number;
+}
+
+export interface ZoneTimeInputs {
+  timeZ1Min?: number;
+  timeZ2Min?: number;
+  timeZ3Min?: number;
+  timeZ4Min?: number;
+  timeZ5Min?: number;
 }
 
 export function calculateTssFinal(
@@ -87,7 +156,8 @@ export function calculateTssFinal(
   rpe: number,
   validated: boolean = true,
   avgHr?: number,
-  lthr: number = DEFAULT_LTHR
+  lthr: number = DEFAULT_LTHR,
+  zoneTimes?: ZoneTimeInputs
 ): TssCalculationResult {
   const sessionType = getSessionType(workoutType);
   
@@ -97,15 +167,40 @@ export function calculateTssFinal(
       tssFinal: 0,
       tssVersion: 'v2_hybrid',
       sessionType: 'legacy',
+      tssMethod: 'RPE',
     };
   }
   
-  // Endurance activities with HR data → HR-TSS
+  // Endurance activities with zone times → HR-TSS by zones
+  if (sessionType === 'endurance' && zoneTimes) {
+    const hasZoneTimes = (zoneTimes.timeZ1Min || 0) + (zoneTimes.timeZ2Min || 0) + 
+                         (zoneTimes.timeZ3Min || 0) + (zoneTimes.timeZ4Min || 0) + 
+                         (zoneTimes.timeZ5Min || 0) > 0;
+    
+    if (hasZoneTimes) {
+      return {
+        tssFinal: calculateHrTssByZones(
+          zoneTimes.timeZ1Min,
+          zoneTimes.timeZ2Min,
+          zoneTimes.timeZ3Min,
+          zoneTimes.timeZ4Min,
+          zoneTimes.timeZ5Min
+        ),
+        tssVersion: 'v2_hybrid',
+        sessionType: 'endurance',
+        tssMethod: 'HR_zones',
+        lthrUsed: lthr,
+      };
+    }
+  }
+  
+  // Endurance activities with HR data → HR-TSS (FC média)
   if (sessionType === 'endurance' && avgHr && avgHr > 0) {
     return {
       tssFinal: calculateHrTss(durationMin, avgHr, lthr),
       tssVersion: 'v2_hybrid',
       sessionType: 'endurance',
+      tssMethod: 'HR_avg',
       lthrUsed: lthr,
     };
   }
@@ -116,6 +211,7 @@ export function calculateTssFinal(
       tssFinal: calculateRpeTss(durationMin, rpe, validated),
       tssVersion: 'v2_hybrid',
       sessionType: 'strength',
+      tssMethod: 'RPE',
     };
   }
   
@@ -124,6 +220,7 @@ export function calculateTssFinal(
     tssFinal: calculateTssSubjective(durationMin, rpe),
     tssVersion: 'v1_rpe',
     sessionType: 'legacy',
+    tssMethod: 'RPE',
   };
 }
 

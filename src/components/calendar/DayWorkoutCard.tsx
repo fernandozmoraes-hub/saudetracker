@@ -1,4 +1,4 @@
-import { Workout } from '@/types/health';
+import { Workout, TssMethod } from '@/types/health';
 import { cn } from '@/lib/utils';
 import { Footprints, Dumbbell, Bike, Bed } from 'lucide-react';
 
@@ -20,20 +20,37 @@ const workoutColors = {
   Rest: 'bg-muted text-muted-foreground border-border',
 };
 
+const getTssMethodLabel = (method?: TssMethod): string => {
+  switch (method) {
+    case 'HR_zones': return 'hrTSS';
+    case 'HR_avg': return 'hrTSS';
+    case 'RPE': return 'rTSS';
+    default: return 'TSS';
+  }
+};
+
+const getTssMethodBadgeClass = (method?: TssMethod): string => {
+  switch (method) {
+    case 'HR_zones': return 'text-accent';
+    case 'HR_avg': return 'text-primary';
+    case 'RPE': return 'text-muted-foreground';
+    default: return 'text-muted-foreground';
+  }
+};
+
 export function DayWorkoutCard({ workout }: DayWorkoutCardProps) {
   const Icon = workoutIcons[workout.type] || Footprints;
   const colorClass = workoutColors[workout.type] || workoutColors.Run;
 
   const hours = Math.floor(workout.durationMin / 60);
-  const minutes = workout.durationMin % 60;
+  const minutes = Math.round(workout.durationMin % 60);
   const durationFormatted = hours > 0 
     ? `${hours}:${String(minutes).padStart(2, '0')}` 
     : `${minutes}min`;
 
   const tss = workout.tssFinal ?? workout.tssSubjective;
-  const tssType = workout.tssVersion === 'v2_hybrid' && workout.sessionType === 'endurance' 
-    ? 'hrTSS' 
-    : 'rTSS';
+  const tssLabel = getTssMethodLabel(workout.tssMethod);
+  const tssClass = getTssMethodBadgeClass(workout.tssMethod);
 
   return (
     <div className={cn(
@@ -70,7 +87,7 @@ export function DayWorkoutCard({ workout }: DayWorkoutCardProps) {
       {/* TSS */}
       <div className="text-right shrink-0">
         <div className="font-bold text-foreground">{Math.round(tss)}</div>
-        <div className="text-[10px] text-muted-foreground uppercase">{tssType}</div>
+        <div className={cn("text-[10px] uppercase", tssClass)}>{tssLabel}</div>
       </div>
     </div>
   );
