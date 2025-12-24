@@ -5,20 +5,42 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useUserSettings } from '@/hooks/useUserSettings';
 import { useToast } from '@/hooks/use-toast';
-import { Heart, Save, Info, Loader2, Activity, Dumbbell } from 'lucide-react';
-import { DEFAULT_LTHR } from '@/lib/calculations';
+import { Heart, Save, Info, Loader2, Activity, Dumbbell, Zap } from 'lucide-react';
+import { DEFAULT_LTHR, DEFAULT_ZONE_THRESHOLDS, getHrZones, ZONE_WEIGHTS } from '@/lib/calculations';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 export default function Settings() {
   const { toast } = useToast();
-  const { settings, isLoading, updateLthr } = useUserSettings();
+  const { settings, isLoading, updateSettings } = useUserSettings();
   const [lthr, setLthr] = useState<number>(DEFAULT_LTHR);
+  const [restingHr, setRestingHr] = useState<number | undefined>();
+  const [maxHr, setMaxHr] = useState<number | undefined>();
+  const [zone1Upper, setZone1Upper] = useState<number>(DEFAULT_ZONE_THRESHOLDS.zone1UpperPct);
+  const [zone2Upper, setZone2Upper] = useState<number>(DEFAULT_ZONE_THRESHOLDS.zone2UpperPct);
+  const [zone3Upper, setZone3Upper] = useState<number>(DEFAULT_ZONE_THRESHOLDS.zone3UpperPct);
+  const [zone4Upper, setZone4Upper] = useState<number>(DEFAULT_ZONE_THRESHOLDS.zone4UpperPct);
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     if (!isLoading) {
       setLthr(settings.lthr);
+      setRestingHr(settings.restingHr);
+      setMaxHr(settings.maxHr);
+      setZone1Upper(settings.zone1UpperPct);
+      setZone2Upper(settings.zone2UpperPct);
+      setZone3Upper(settings.zone3UpperPct);
+      setZone4Upper(settings.zone4UpperPct);
     }
-  }, [settings.lthr, isLoading]);
+  }, [settings, isLoading]);
+
+  const hasChanges = 
+    lthr !== settings.lthr ||
+    restingHr !== settings.restingHr ||
+    maxHr !== settings.maxHr ||
+    zone1Upper !== settings.zone1UpperPct ||
+    zone2Upper !== settings.zone2UpperPct ||
+    zone3Upper !== settings.zone3UpperPct ||
+    zone4Upper !== settings.zone4UpperPct;
 
   const handleSave = async () => {
     if (lthr < 100 || lthr > 220) {
@@ -30,14 +52,32 @@ export default function Settings() {
       return;
     }
 
+    // Validate zone thresholds are in order
+    if (zone1Upper >= zone2Upper || zone2Upper >= zone3Upper || zone3Upper >= zone4Upper) {
+      toast({
+        title: 'Zonas inválidas',
+        description: 'Os limites das zonas devem estar em ordem crescente',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setIsSaving(true);
-    const success = await updateLthr(lthr);
+    const success = await updateSettings({
+      lthr,
+      restingHr,
+      maxHr,
+      zone1UpperPct: zone1Upper,
+      zone2UpperPct: zone2Upper,
+      zone3UpperPct: zone3Upper,
+      zone4UpperPct: zone4Upper,
+    });
     setIsSaving(false);
 
     if (success) {
       toast({
         title: 'Configurações salvas',
-        description: `LTHR atualizado para ${lthr} bpm`,
+        description: 'Parâmetros de treino atualizados',
       });
     } else {
       toast({
@@ -47,6 +87,16 @@ export default function Settings() {
       });
     }
   };
+
+  const handleResetZones = () => {
+    setZone1Upper(DEFAULT_ZONE_THRESHOLDS.zone1UpperPct);
+    setZone2Upper(DEFAULT_ZONE_THRESHOLDS.zone2UpperPct);
+    setZone3Upper(DEFAULT_ZONE_THRESHOLDS.zone3UpperPct);
+    setZone4Upper(DEFAULT_ZONE_THRESHOLDS.zone4UpperPct);
+  };
+
+  // Calculate zones for display
+  const zones = getHrZones(lthr, zone1Upper, zone2Upper, zone3Upper, zone4Upper);
 
   if (isLoading) {
     return (
@@ -63,46 +113,181 @@ export default function Settings() {
       title="Configurações" 
       subtitle="Personalize seus parâmetros de treino"
     >
-      {/* LTHR Card */}
+      {/* Parâmetros Fisiológicos */}
       <div className="gradient-card rounded-xl p-6 border border-border/50 space-y-4 animate-slide-up">
         <div className="flex items-center gap-3">
           <div className="p-2 rounded-lg bg-primary/10">
             <Heart className="w-5 h-5 text-primary" />
           </div>
           <div>
-            <h3 className="font-display font-semibold">LTHR - FC de Limiar</h3>
+            <h3 className="font-display font-semibold">Parâmetros Fisiológicos</h3>
             <p className="text-sm text-muted-foreground">
-              Frequência cardíaca no limiar de lactato
+              Configure sua frequência cardíaca
             </p>
           </div>
         </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="lthr">LTHR (bpm)</Label>
-          <Input
-            id="lthr"
-            type="number"
-            min={100}
-            max={220}
-            value={lthr}
-            onChange={(e) => setLthr(Number(e.target.value))}
-            className="text-lg"
-            placeholder="165"
-          />
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="lthr" className="flex items-center gap-1">
+              LTHR (bpm)
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="w-3.5 h-3.5 text-muted-foreground cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p className="max-w-xs">FC de limiar de lactato. Base para cálculo das zonas.</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </Label>
+            <Input
+              id="lthr"
+              type="number"
+              min={100}
+              max={220}
+              value={lthr}
+              onChange={(e) => setLthr(Number(e.target.value))}
+              className="text-lg"
+              placeholder="165"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="restingHr">FC Repouso (opcional)</Label>
+            <Input
+              id="restingHr"
+              type="number"
+              min={30}
+              max={100}
+              value={restingHr || ''}
+              onChange={(e) => setRestingHr(e.target.value ? Number(e.target.value) : undefined)}
+              placeholder="55"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="maxHr">FC Máxima (opcional)</Label>
+            <Input
+              id="maxHr"
+              type="number"
+              min={150}
+              max={220}
+              value={maxHr || ''}
+              onChange={(e) => setMaxHr(e.target.value ? Number(e.target.value) : undefined)}
+              placeholder="190"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Zonas de FC */}
+      <div className="gradient-card rounded-xl p-6 border border-border/50 space-y-4 animate-slide-up">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-accent/10">
+              <Zap className="w-5 h-5 text-accent" />
+            </div>
+            <div>
+              <h3 className="font-display font-semibold">Zonas de Frequência Cardíaca</h3>
+              <p className="text-sm text-muted-foreground">
+                Limites em % do LTHR (editáveis)
+              </p>
+            </div>
+          </div>
+          <Button variant="ghost" size="sm" onClick={handleResetZones}>
+            Reset
+          </Button>
         </div>
 
-        <Button 
-          onClick={handleSave}
-          disabled={isSaving || lthr === settings.lthr}
-          className="w-full"
-        >
-          {isSaving ? (
-            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-          ) : (
-            <Save className="w-4 h-4 mr-2" />
-          )}
-          Salvar
-        </Button>
+        <div className="space-y-3">
+          {/* Zone headers */}
+          <div className="grid grid-cols-5 gap-2 text-xs text-muted-foreground font-medium px-1">
+            <span>Zona</span>
+            <span>Faixa (%)</span>
+            <span>Limite Superior</span>
+            <span>FC (bpm)</span>
+            <span>Peso</span>
+          </div>
+
+          {/* Z1 */}
+          <div className="grid grid-cols-5 gap-2 items-center p-2 rounded-lg bg-blue-500/10 border border-blue-500/20">
+            <span className="font-medium text-blue-400">Z1</span>
+            <span className="text-sm text-muted-foreground">0–{zone1Upper}%</span>
+            <Input
+              type="number"
+              min={50}
+              max={zone2Upper - 1}
+              value={zone1Upper}
+              onChange={(e) => setZone1Upper(Number(e.target.value))}
+              className="h-8 text-sm"
+            />
+            <span className="text-sm">≤ {zones[0].upperBpm}</span>
+            <span className="text-sm font-medium">{ZONE_WEIGHTS[1]}</span>
+          </div>
+
+          {/* Z2 */}
+          <div className="grid grid-cols-5 gap-2 items-center p-2 rounded-lg bg-green-500/10 border border-green-500/20">
+            <span className="font-medium text-green-400">Z2</span>
+            <span className="text-sm text-muted-foreground">{zone1Upper + 1}–{zone2Upper}%</span>
+            <Input
+              type="number"
+              min={zone1Upper + 1}
+              max={zone3Upper - 1}
+              value={zone2Upper}
+              onChange={(e) => setZone2Upper(Number(e.target.value))}
+              className="h-8 text-sm"
+            />
+            <span className="text-sm">{zones[1].lowerBpm}–{zones[1].upperBpm}</span>
+            <span className="text-sm font-medium">{ZONE_WEIGHTS[2]}</span>
+          </div>
+
+          {/* Z3 */}
+          <div className="grid grid-cols-5 gap-2 items-center p-2 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
+            <span className="font-medium text-yellow-400">Z3</span>
+            <span className="text-sm text-muted-foreground">{zone2Upper + 1}–{zone3Upper}%</span>
+            <Input
+              type="number"
+              min={zone2Upper + 1}
+              max={zone4Upper - 1}
+              value={zone3Upper}
+              onChange={(e) => setZone3Upper(Number(e.target.value))}
+              className="h-8 text-sm"
+            />
+            <span className="text-sm">{zones[2].lowerBpm}–{zones[2].upperBpm}</span>
+            <span className="text-sm font-medium">{ZONE_WEIGHTS[3]}</span>
+          </div>
+
+          {/* Z4 */}
+          <div className="grid grid-cols-5 gap-2 items-center p-2 rounded-lg bg-orange-500/10 border border-orange-500/20">
+            <span className="font-medium text-orange-400">Z4</span>
+            <span className="text-sm text-muted-foreground">{zone3Upper + 1}–{zone4Upper}%</span>
+            <Input
+              type="number"
+              min={zone3Upper + 1}
+              max={110}
+              value={zone4Upper}
+              onChange={(e) => setZone4Upper(Number(e.target.value))}
+              className="h-8 text-sm"
+            />
+            <span className="text-sm">{zones[3].lowerBpm}–{zones[3].upperBpm}</span>
+            <span className="text-sm font-medium">{ZONE_WEIGHTS[4]}</span>
+          </div>
+
+          {/* Z5 */}
+          <div className="grid grid-cols-5 gap-2 items-center p-2 rounded-lg bg-red-500/10 border border-red-500/20">
+            <span className="font-medium text-red-400">Z5</span>
+            <span className="text-sm text-muted-foreground">≥{zone4Upper + 1}%</span>
+            <span className="text-sm text-muted-foreground px-3">—</span>
+            <span className="text-sm">≥ {zones[4].lowerBpm}</span>
+            <span className="text-sm font-medium">{ZONE_WEIGHTS[5]}</span>
+          </div>
+        </div>
+
+        <p className="text-xs text-muted-foreground">
+          Pesos baseados no modelo TrainingPeaks. A fórmula HR-TSS (Zonas) é: Σ (horas × peso²) × 100
+        </p>
       </div>
 
       {/* Active Model Banner */}
@@ -118,7 +303,7 @@ export default function Settings() {
             <Heart className="w-4 h-4 text-primary" />
             <div>
               <p className="text-sm font-medium">Endurance</p>
-              <p className="text-xs text-muted-foreground">via FC (HR-TSS)</p>
+              <p className="text-xs text-muted-foreground">HR-TSS (Zonas ou FC média)</p>
             </div>
           </div>
           <div className="flex items-center gap-2 p-3 rounded-lg bg-secondary/70 flex-1">
@@ -136,8 +321,8 @@ export default function Settings() {
             (corrida, bike) com o RPE-TSS para treinos de força.
           </p>
           <p>
-            O HR-TSS utiliza sua FC média e LTHR para calcular a carga de forma mais precisa. 
-            O RPE-TSS aplica um fator de validação (×0.7 se não completou todos os sets).
+            <strong>HR-TSS por Zonas</strong> utiliza o tempo em cada zona de FC para cálculo preciso. 
+            <strong>HR-TSS por FC média</strong> é usado quando não há dados de zonas.
           </p>
         </div>
       </div>
@@ -154,16 +339,29 @@ export default function Settings() {
             <strong>Como descobrir?</strong> Faça um teste de 30 minutos em ritmo máximo sustentável. 
             A FC média dos últimos 20 minutos é uma boa estimativa do seu LTHR.
           </p>
-          <p>
-            <strong>Para que serve?</strong> O LTHR é usado para calcular o TSS (Training Stress Score) 
-            em treinos de endurance como corrida e bike, oferecendo uma métrica mais precisa do que apenas RPE.
+          <p className="text-xs italic">
+            Este cálculo é inspirado no HR-TSS do TrainingPeaks, mas pode apresentar pequenas diferenças.
           </p>
         </div>
       </div>
 
+      {/* Save Button */}
+      <Button 
+        onClick={handleSave}
+        disabled={isSaving || !hasChanges}
+        className="w-full"
+      >
+        {isSaving ? (
+          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+        ) : (
+          <Save className="w-4 h-4 mr-2" />
+        )}
+        Salvar Configurações
+      </Button>
+
       {/* Current Value Display */}
       <div className="text-center p-4 rounded-xl bg-primary/5 border border-primary/20 animate-slide-up">
-        <p className="text-sm text-muted-foreground mb-1">Valor atual</p>
+        <p className="text-sm text-muted-foreground mb-1">LTHR atual</p>
         <p className="text-3xl font-display font-bold text-primary">
           {settings.lthr} <span className="text-lg font-normal text-muted-foreground">bpm</span>
         </p>

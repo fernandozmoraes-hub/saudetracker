@@ -120,6 +120,14 @@ export async function getWorkouts(): Promise<Workout[]> {
     distanceKm: row.distance_km ? Number(row.distance_km) : undefined,
     avgHr: row.avg_hr ?? undefined,
     lthrUsed: (row as any).lthr_used ?? undefined,
+    muscleGroups: (row as any).muscle_groups ?? undefined,
+    // HR-TSS por zonas
+    timeZ1Min: (row as any).time_z1_min ? Number((row as any).time_z1_min) : undefined,
+    timeZ2Min: (row as any).time_z2_min ? Number((row as any).time_z2_min) : undefined,
+    timeZ3Min: (row as any).time_z3_min ? Number((row as any).time_z3_min) : undefined,
+    timeZ4Min: (row as any).time_z4_min ? Number((row as any).time_z4_min) : undefined,
+    timeZ5Min: (row as any).time_z5_min ? Number((row as any).time_z5_min) : undefined,
+    tssMethod: ((row as any).tss_method ?? 'HR_avg') as Workout['tssMethod'],
   }));
 }
 
@@ -134,12 +142,24 @@ export async function saveWorkout(workout: Workout): Promise<boolean> {
       user_id: userId,
       date: workout.date,
       type: workout.type,
+      session_type: workout.sessionType,
+      tss_version: workout.tssVersion,
       duration_min: workout.durationMin,
       rpe: workout.rpe,
       tss_subjective: workout.tssSubjective,
+      tss_final: workout.tssFinal,
       validated: workout.validated,
       distance_km: workout.distanceKm ?? null,
       avg_hr: workout.avgHr ?? null,
+      lthr_used: workout.lthrUsed ?? null,
+      muscle_groups: workout.muscleGroups ?? null,
+      // HR-TSS por zonas
+      time_z1_min: workout.timeZ1Min ?? 0,
+      time_z2_min: workout.timeZ2Min ?? 0,
+      time_z3_min: workout.timeZ3Min ?? 0,
+      time_z4_min: workout.timeZ4Min ?? 0,
+      time_z5_min: workout.timeZ5Min ?? 0,
+      tss_method: workout.tssMethod ?? 'HR_avg',
     }, {
       onConflict: 'id',
     });
@@ -182,6 +202,14 @@ export async function getWorkoutsByDate(date: string): Promise<Workout[]> {
     distanceKm: row.distance_km ? Number(row.distance_km) : undefined,
     avgHr: row.avg_hr ?? undefined,
     lthrUsed: (row as any).lthr_used ?? undefined,
+    muscleGroups: (row as any).muscle_groups ?? undefined,
+    // HR-TSS por zonas
+    timeZ1Min: (row as any).time_z1_min ? Number((row as any).time_z1_min) : undefined,
+    timeZ2Min: (row as any).time_z2_min ? Number((row as any).time_z2_min) : undefined,
+    timeZ3Min: (row as any).time_z3_min ? Number((row as any).time_z3_min) : undefined,
+    timeZ4Min: (row as any).time_z4_min ? Number((row as any).time_z4_min) : undefined,
+    timeZ5Min: (row as any).time_z5_min ? Number((row as any).time_z5_min) : undefined,
+    tssMethod: ((row as any).tss_method ?? 'HR_avg') as Workout['tssMethod'],
   }));
 }
 

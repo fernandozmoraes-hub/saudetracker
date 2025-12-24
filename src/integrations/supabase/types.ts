@@ -64,22 +64,40 @@ export type Database = {
           created_at: string | null
           id: string
           lthr: number | null
+          max_hr: number | null
+          resting_hr: number | null
           updated_at: string | null
           user_id: string
+          zone1_upper_pct: number | null
+          zone2_upper_pct: number | null
+          zone3_upper_pct: number | null
+          zone4_upper_pct: number | null
         }
         Insert: {
           created_at?: string | null
           id?: string
           lthr?: number | null
+          max_hr?: number | null
+          resting_hr?: number | null
           updated_at?: string | null
           user_id: string
+          zone1_upper_pct?: number | null
+          zone2_upper_pct?: number | null
+          zone3_upper_pct?: number | null
+          zone4_upper_pct?: number | null
         }
         Update: {
           created_at?: string | null
           id?: string
           lthr?: number | null
+          max_hr?: number | null
+          resting_hr?: number | null
           updated_at?: string | null
           user_id?: string
+          zone1_upper_pct?: number | null
+          zone2_upper_pct?: number | null
+          zone3_upper_pct?: number | null
+          zone4_upper_pct?: number | null
         }
         Relationships: []
       }
@@ -95,7 +113,13 @@ export type Database = {
           muscle_groups: string[] | null
           rpe: number
           session_type: string | null
+          time_z1_min: number | null
+          time_z2_min: number | null
+          time_z3_min: number | null
+          time_z4_min: number | null
+          time_z5_min: number | null
           tss_final: number | null
+          tss_method: string | null
           tss_subjective: number
           tss_version: string | null
           type: string
@@ -113,7 +137,13 @@ export type Database = {
           muscle_groups?: string[] | null
           rpe?: number
           session_type?: string | null
+          time_z1_min?: number | null
+          time_z2_min?: number | null
+          time_z3_min?: number | null
+          time_z4_min?: number | null
+          time_z5_min?: number | null
           tss_final?: number | null
+          tss_method?: string | null
           tss_subjective?: number
           tss_version?: string | null
           type: string
@@ -131,7 +161,13 @@ export type Database = {
           muscle_groups?: string[] | null
           rpe?: number
           session_type?: string | null
+          time_z1_min?: number | null
+          time_z2_min?: number | null
+          time_z3_min?: number | null
+          time_z4_min?: number | null
+          time_z5_min?: number | null
           tss_final?: number | null
+          tss_method?: string | null
           tss_subjective?: number
           tss_version?: string | null
           type?: string
