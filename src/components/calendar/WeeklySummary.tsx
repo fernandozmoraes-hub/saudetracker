@@ -46,8 +46,9 @@ export function WeeklySummary({ weekStart, weekEnd, workouts }: WeeklySummaryPro
   const atl = calculateATL(lastDay, workouts);
   const tsb = ctl - atl;
 
-  const hours = Math.floor(weeklyStats.totalDuration / 60);
-  const minutes = weeklyStats.totalDuration % 60;
+  const totalMinutes = Math.round(weeklyStats.totalDuration);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
 
   const getTsbStatus = (value: number) => {
     if (value > 10) return { label: 'Fresh', color: 'text-green-500' };
