@@ -6,7 +6,7 @@ const navItems = [
   { path: '/checkin', label: 'Check-in', icon: Heart },
   { path: '/workout', label: 'Treino', icon: Dumbbell },
   { path: '/', label: 'Hoje', icon: Home },
-  { path: '/week', label: 'Semana', icon: Calendar },
+  { path: '/calendar', label: 'Calendário', icon: Calendar },
   { path: '/settings', label: 'Config', icon: Settings },
 ];
 
