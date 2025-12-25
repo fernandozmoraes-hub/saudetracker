@@ -65,8 +65,6 @@ export default function Workout() {
   const { settings } = useUserSettings();
   const { isConnected } = useStravaConnection();
   const [showStravaModal, setShowStravaModal] = useState(false);
-  const { workouts, saveWorkout } = useData();
-  const { settings } = useUserSettings();
   
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [selectedType, setSelectedType] = useState<WorkoutTypeEnum | null>(null);

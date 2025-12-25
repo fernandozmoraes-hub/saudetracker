@@ -42,7 +42,6 @@ export default function Settings() {
       });
     }
   }, [searchParams]);
-  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     if (!isLoading) {
