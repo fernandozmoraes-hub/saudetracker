@@ -59,6 +59,45 @@ export type Database = {
         }
         Relationships: []
       }
+      strava_connections: {
+        Row: {
+          access_token: string
+          athlete_name: string | null
+          created_at: string | null
+          expires_at: string
+          id: string
+          refresh_token: string
+          scope: string | null
+          strava_athlete_id: number
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          access_token: string
+          athlete_name?: string | null
+          created_at?: string | null
+          expires_at: string
+          id?: string
+          refresh_token: string
+          scope?: string | null
+          strava_athlete_id: number
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          access_token?: string
+          athlete_name?: string | null
+          created_at?: string | null
+          expires_at?: string
+          id?: string
+          refresh_token?: string
+          scope?: string | null
+          strava_athlete_id?: number
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_settings: {
         Row: {
           created_at: string | null
@@ -113,6 +152,7 @@ export type Database = {
           muscle_groups: string[] | null
           rpe: number
           session_type: string | null
+          strava_activity_id: number | null
           time_z1_min: number | null
           time_z2_min: number | null
           time_z3_min: number | null
@@ -137,6 +177,7 @@ export type Database = {
           muscle_groups?: string[] | null
           rpe?: number
           session_type?: string | null
+          strava_activity_id?: number | null
           time_z1_min?: number | null
           time_z2_min?: number | null
           time_z3_min?: number | null
@@ -161,6 +202,7 @@ export type Database = {
           muscle_groups?: string[] | null
           rpe?: number
           session_type?: string | null
+          strava_activity_id?: number | null
           time_z1_min?: number | null
           time_z2_min?: number | null
           time_z3_min?: number | null

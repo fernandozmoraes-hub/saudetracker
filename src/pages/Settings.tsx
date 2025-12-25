@@ -1,17 +1,21 @@
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useUserSettings } from '@/hooks/useUserSettings';
+import { useStravaConnection } from '@/hooks/useStravaConnection';
 import { useToast } from '@/hooks/use-toast';
-import { Heart, Save, Info, Loader2, Activity, Dumbbell, Zap } from 'lucide-react';
+import { Heart, Save, Info, Loader2, Activity, Dumbbell, Zap, Link2, Unlink, CheckCircle2 } from 'lucide-react';
 import { DEFAULT_LTHR, DEFAULT_ZONE_THRESHOLDS, getHrZones, ZONE_WEIGHTS } from '@/lib/calculations';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 export default function Settings() {
   const { toast } = useToast();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { settings, isLoading, updateSettings } = useUserSettings();
+  const { connection, isLoading: isLoadingStrava, isConnecting, isConnected, connect, disconnect, handleCallback } = useStravaConnection();
   const [lthr, setLthr] = useState<number>(DEFAULT_LTHR);
   const [restingHr, setRestingHr] = useState<number | undefined>();
   const [maxHr, setMaxHr] = useState<number | undefined>();
@@ -19,6 +23,25 @@ export default function Settings() {
   const [zone2Upper, setZone2Upper] = useState<number>(DEFAULT_ZONE_THRESHOLDS.zone2UpperPct);
   const [zone3Upper, setZone3Upper] = useState<number>(DEFAULT_ZONE_THRESHOLDS.zone3UpperPct);
   const [zone4Upper, setZone4Upper] = useState<number>(DEFAULT_ZONE_THRESHOLDS.zone4UpperPct);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isDisconnecting, setIsDisconnecting] = useState(false);
+
+  // Handle Strava OAuth callback
+  useEffect(() => {
+    const code = searchParams.get('code');
+    const stravaCallback = searchParams.get('strava_callback');
+    
+    if (code && stravaCallback) {
+      handleCallback(code).then((success) => {
+        if (success) {
+          toast({ title: 'Strava conectado!', description: 'Agora você pode importar atividades.' });
+        } else {
+          toast({ title: 'Erro ao conectar', description: 'Não foi possível conectar ao Strava.', variant: 'destructive' });
+        }
+        setSearchParams({});
+      });
+    }
+  }, [searchParams]);
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
@@ -97,6 +120,17 @@ export default function Settings() {
 
   // Calculate zones for display
   const zones = getHrZones(lthr, zone1Upper, zone2Upper, zone3Upper, zone4Upper);
+
+  const handleDisconnectStrava = async () => {
+    setIsDisconnecting(true);
+    const success = await disconnect();
+    setIsDisconnecting(false);
+    if (success) {
+      toast({ title: 'Strava desconectado' });
+    } else {
+      toast({ title: 'Erro ao desconectar', variant: 'destructive' });
+    }
+  };
 
   if (isLoading) {
     return (
@@ -343,6 +377,59 @@ export default function Settings() {
             Este cálculo é inspirado no HR-TSS do TrainingPeaks, mas pode apresentar pequenas diferenças.
           </p>
         </div>
+      </div>
+
+      {/* Strava Integration */}
+      <div className="gradient-card rounded-xl p-6 border border-border/50 space-y-4 animate-slide-up">
+        <div className="flex items-center gap-3">
+          <div className="p-2 rounded-lg bg-orange-500/10">
+            <img src="https://upload.wikimedia.org/wikipedia/commons/c/cb/Strava_Logo.svg" alt="Strava" className="w-5 h-5" />
+          </div>
+          <div className="flex-1">
+            <h3 className="font-display font-semibold">Integração Strava</h3>
+            <p className="text-sm text-muted-foreground">
+              Importe atividades com dados de FC por zona
+            </p>
+          </div>
+          {isConnected && (
+            <span className="flex items-center gap-1 text-xs px-2 py-1 rounded-full bg-green-500/20 text-green-500">
+              <CheckCircle2 className="w-3 h-3" />
+              Conectado
+            </span>
+          )}
+        </div>
+
+        {isLoadingStrava ? (
+          <div className="flex items-center justify-center py-4">
+            <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+          </div>
+        ) : isConnected ? (
+          <div className="flex items-center justify-between p-3 rounded-lg bg-secondary border border-border">
+            <div>
+              <p className="font-medium">{connection?.athlete_name || 'Atleta Strava'}</p>
+              <p className="text-sm text-muted-foreground">ID: {connection?.strava_athlete_id}</p>
+            </div>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={handleDisconnectStrava}
+              disabled={isDisconnecting}
+            >
+              {isDisconnecting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Unlink className="w-4 h-4 mr-1" />}
+              Desconectar
+            </Button>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Conecte sua conta Strava para importar atividades automaticamente com dados de frequência cardíaca por zona.
+            </p>
+            <Button onClick={connect} disabled={isConnecting} className="w-full">
+              {isConnecting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Link2 className="w-4 h-4 mr-2" />}
+              Conectar com Strava
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Save Button */}
