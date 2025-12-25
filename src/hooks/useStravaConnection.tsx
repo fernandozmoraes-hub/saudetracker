@@ -41,16 +41,11 @@ export function useStravaConnection() {
 
   const getAuthUrl = async (): Promise<string | null> => {
     try {
-      const redirectUri = `${window.location.origin}/settings?strava_callback=true`;
+      // Pass the current origin so the edge function knows where to redirect back
+      const origin = window.location.origin;
       
-      const { data, error } = await supabase.functions.invoke('strava-auth', {
-        body: null,
-        headers: {},
-      });
-
-      // Use query params for GET-like request
       const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/strava-auth?action=authorize&redirect_uri=${encodeURIComponent(redirectUri)}`,
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/strava-auth?action=authorize&origin=${encodeURIComponent(origin)}`,
         {
           headers: {
             'Content-Type': 'application/json',
@@ -84,6 +79,48 @@ export function useStravaConnection() {
     }
   };
 
+  // Handle the new OAuth callback with tokens in URL
+  const handleOAuthCallback = async (params: {
+    athleteId: string;
+    athleteName: string;
+    accessToken: string;
+    refreshToken: string;
+    expiresAt: string;
+    scope: string;
+  }): Promise<boolean> => {
+    if (!user) return false;
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return false;
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/strava-auth?action=save_connection`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify(params),
+        }
+      );
+
+      if (!response.ok) {
+        const error = await response.json();
+        console.error('Strava save connection error:', error);
+        return false;
+      }
+
+      await fetchConnection();
+      return true;
+    } catch (err) {
+      console.error('Error saving Strava connection:', err);
+      return false;
+    }
+  };
+
+  // Legacy callback handler (keeping for backwards compatibility)
   const handleCallback = async (code: string): Promise<boolean> => {
     if (!user) return false;
 
@@ -205,6 +242,7 @@ export function useStravaConnection() {
     connect,
     disconnect,
     handleCallback,
+    handleOAuthCallback,
     listActivities,
     getActivityDetails,
     refetch: fetchConnection,
