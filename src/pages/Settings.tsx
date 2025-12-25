@@ -15,7 +15,7 @@ export default function Settings() {
   const { toast } = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
   const { settings, isLoading, updateSettings } = useUserSettings();
-  const { connection, isLoading: isLoadingStrava, isConnecting, isConnected, connect, disconnect, handleCallback } = useStravaConnection();
+  const { connection, isLoading: isLoadingStrava, isConnecting, isConnected, connect, disconnect, handleCallback, handleOAuthCallback } = useStravaConnection();
   const [lthr, setLthr] = useState<number>(DEFAULT_LTHR);
   const [restingHr, setRestingHr] = useState<number | undefined>();
   const [maxHr, setMaxHr] = useState<number | undefined>();
@@ -26,13 +26,51 @@ export default function Settings() {
   const [isSaving, setIsSaving] = useState(false);
   const [isDisconnecting, setIsDisconnecting] = useState(false);
 
-  // Handle Strava OAuth callback
+  // Handle Strava OAuth callback (new flow with tokens in URL)
   useEffect(() => {
-    const code = searchParams.get('code');
-    const stravaCallback = searchParams.get('strava_callback');
+    const stravaSuccess = searchParams.get('strava_success');
+    const stravaError = searchParams.get('strava_error');
+    const legacyCode = searchParams.get('code');
+    const legacyCallback = searchParams.get('strava_callback');
     
-    if (code && stravaCallback) {
-      handleCallback(code).then((success) => {
+    // New flow: tokens are in URL params
+    if (stravaSuccess === 'true') {
+      const athleteId = searchParams.get('strava_athlete_id');
+      const athleteName = searchParams.get('strava_athlete_name');
+      const accessToken = searchParams.get('strava_access_token');
+      const refreshToken = searchParams.get('strava_refresh_token');
+      const expiresAt = searchParams.get('strava_expires_at');
+      const scope = searchParams.get('strava_scope');
+
+      if (athleteId && accessToken && refreshToken && expiresAt) {
+        handleOAuthCallback({
+          athleteId,
+          athleteName: athleteName || 'Atleta Strava',
+          accessToken,
+          refreshToken,
+          expiresAt,
+          scope: scope || 'read,activity:read_all',
+        }).then((success) => {
+          if (success) {
+            toast({ title: 'Strava conectado!', description: 'Agora você pode importar atividades.' });
+          } else {
+            toast({ title: 'Erro ao salvar conexão', description: 'Tente novamente.', variant: 'destructive' });
+          }
+          // Clear URL params
+          setSearchParams({});
+        });
+      }
+    } else if (stravaError) {
+      toast({ 
+        title: 'Erro na conexão Strava', 
+        description: `Erro: ${stravaError}`, 
+        variant: 'destructive' 
+      });
+      setSearchParams({});
+    }
+    // Legacy flow: code in URL
+    else if (legacyCode && legacyCallback) {
+      handleCallback(legacyCode).then((success) => {
         if (success) {
           toast({ title: 'Strava conectado!', description: 'Agora você pode importar atividades.' });
         } else {
