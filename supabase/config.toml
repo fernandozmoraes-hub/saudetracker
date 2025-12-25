@@ -2,3 +2,9 @@ project_id = "vxcizmlcvwdnzmngasid"
 
 [functions.ai-coach]
 verify_jwt = true
+
+[functions.strava-auth]
+verify_jwt = false
+
+[functions.strava-import]
+verify_jwt = true

@@ -14,8 +14,11 @@ import { useData } from '@/hooks/useData';
 import { useUserSettings } from '@/hooks/useUserSettings';
 import { calculateTssSubjective, calculateTssFinal, getHrZones, ZoneTimeInputs } from '@/lib/calculations';
 import { Workout as WorkoutType, WorkoutType as WorkoutTypeEnum, TssMethod } from '@/types/health';
+import { StravaActivityDetails } from '@/types/strava';
+import { useStravaConnection } from '@/hooks/useStravaConnection';
+import { StravaImportModal } from '@/components/strava/StravaImportModal';
 import { useToast } from '@/hooks/use-toast';
-import { Dumbbell, Bike, Timer, Activity, Check, MapPin, Heart, CalendarIcon, Settings, Info, Zap } from 'lucide-react';
+import { Dumbbell, Bike, Timer, Activity, Check, MapPin, Heart, CalendarIcon, Settings, Info, Zap, Download } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 const workoutTypes: { type: WorkoutTypeEnum; label: string; icon: React.ReactNode }[] = [
@@ -58,6 +61,10 @@ const getTssMethodBadgeClass = (method?: TssMethod): string => {
 
 export default function Workout() {
   const { toast } = useToast();
+  const { workouts, saveWorkout } = useData();
+  const { settings } = useUserSettings();
+  const { isConnected } = useStravaConnection();
+  const [showStravaModal, setShowStravaModal] = useState(false);
   const { workouts, saveWorkout } = useData();
   const { settings } = useUserSettings();
   
@@ -219,6 +226,30 @@ export default function Workout() {
   const getMuscleGroupLabel = (id: string) => {
     return muscleGroupOptions.find(m => m.id === id)?.label || id;
   };
+
+  const handleStravaImport = (activity: StravaActivityDetails) => {
+    setSelectedDate(new Date(activity.date));
+    setSelectedType(activity.type as WorkoutTypeEnum);
+    setDuration(activity.durationMin);
+    setDistance(activity.distanceKm || undefined);
+    setAvgHr(activity.avgHr || undefined);
+    
+    if (activity.zones) {
+      setUseZoneTimes(true);
+      setTimeZ1(activity.zones.z1);
+      setTimeZ2(activity.zones.z2);
+      setTimeZ3(activity.zones.z3);
+      setTimeZ4(activity.zones.z4);
+      setTimeZ5(activity.zones.z5);
+    } else {
+      setUseZoneTimes(false);
+    }
+
+    toast({
+      title: 'Atividade importada',
+      description: `${activity.name} - adicione o RPE e salve`,
+    });
+  };
   
   return (
     <PageContainer 
@@ -274,6 +305,24 @@ export default function Workout() {
           </div>
         </div>
       )}
+
+      {/* Strava Import Button */}
+      {isConnected && (
+        <Button 
+          variant="outline" 
+          className="w-full mb-4 border-orange-500/30 hover:bg-orange-500/10"
+          onClick={() => setShowStravaModal(true)}
+        >
+          <Download className="w-4 h-4 mr-2 text-orange-500" />
+          Importar do Strava
+        </Button>
+      )}
+
+      <StravaImportModal 
+        open={showStravaModal} 
+        onOpenChange={setShowStravaModal}
+        onImport={handleStravaImport}
+      />
       
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="space-y-3">
