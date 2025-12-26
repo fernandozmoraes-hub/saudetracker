@@ -18,7 +18,7 @@ import { StravaActivityDetails } from '@/types/strava';
 import { useStravaConnection } from '@/hooks/useStravaConnection';
 import { StravaImportModal } from '@/components/strava/StravaImportModal';
 import { useToast } from '@/hooks/use-toast';
-import { Dumbbell, Bike, Timer, Activity, Check, MapPin, Heart, CalendarIcon, Settings, Info, Zap, Download } from 'lucide-react';
+import { Dumbbell, Bike, Timer, Activity, Check, MapPin, Heart, CalendarIcon, Settings, Info, Zap, Download, Pencil } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 
 const workoutTypes: { type: WorkoutTypeEnum; label: string; icon: React.ReactNode }[] = [
@@ -289,9 +289,12 @@ export default function Workout() {
       subtitle={
         <Popover>
           <PopoverTrigger asChild>
-            <button className="flex items-center gap-2 text-muted-foreground hover:text-primary transition-colors">
+            <button className="flex items-center gap-2 text-muted-foreground hover:text-primary transition-colors group">
               <CalendarIcon className="w-4 h-4" />
               {format(selectedDate, "EEEE, d 'de' MMMM", { locale: ptBR })}
+              {isEditMode && (
+                <Pencil className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+              )}
             </button>
           </PopoverTrigger>
           <PopoverContent className="w-auto p-0" align="start">
