@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { format, isToday } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { PageContainer } from '@/components/layout/PageContainer';
@@ -19,7 +19,7 @@ import { useStravaConnection } from '@/hooks/useStravaConnection';
 import { StravaImportModal } from '@/components/strava/StravaImportModal';
 import { useToast } from '@/hooks/use-toast';
 import { Dumbbell, Bike, Timer, Activity, Check, MapPin, Heart, CalendarIcon, Settings, Info, Zap, Download } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 
 const workoutTypes: { type: WorkoutTypeEnum; label: string; icon: React.ReactNode }[] = [
   { type: 'Run', label: 'Corrida', icon: <Activity className="w-5 h-5" /> },
@@ -64,7 +64,13 @@ export default function Workout() {
   const { workouts, saveWorkout } = useData();
   const { settings } = useUserSettings();
   const { isConnected } = useStravaConnection();
+  const location = useLocation();
+  const navigate = useNavigate();
   const [showStravaModal, setShowStravaModal] = useState(false);
+  
+  // Check if we're in edit mode
+  const editWorkout = location.state?.editWorkout as WorkoutType | undefined;
+  const isEditMode = !!editWorkout;
   
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [selectedType, setSelectedType] = useState<WorkoutTypeEnum | null>(null);
@@ -82,6 +88,29 @@ export default function Workout() {
   const [timeZ3, setTimeZ3] = useState<number>(0);
   const [timeZ4, setTimeZ4] = useState<number>(0);
   const [timeZ5, setTimeZ5] = useState<number>(0);
+
+  // Populate form when editing
+  useEffect(() => {
+    if (editWorkout) {
+      setSelectedDate(new Date(editWorkout.date));
+      setSelectedType(editWorkout.type);
+      setDuration(editWorkout.durationMin || undefined);
+      setRpe(editWorkout.rpe || 5);
+      setValidated(editWorkout.validated || false);
+      setDistance(editWorkout.distanceKm || undefined);
+      setAvgHr(editWorkout.avgHr || undefined);
+      setMuscleGroups(editWorkout.muscleGroups || []);
+      
+      // HR Zone times
+      const hasZones = editWorkout.timeZ1Min || editWorkout.timeZ2Min || editWorkout.timeZ3Min || editWorkout.timeZ4Min || editWorkout.timeZ5Min;
+      setUseZoneTimes(!!hasZones);
+      setTimeZ1(editWorkout.timeZ1Min || 0);
+      setTimeZ2(editWorkout.timeZ2Min || 0);
+      setTimeZ3(editWorkout.timeZ3Min || 0);
+      setTimeZ4(editWorkout.timeZ4Min || 0);
+      setTimeZ5(editWorkout.timeZ5Min || 0);
+    }
+  }, [editWorkout]);
   
   const dateString = format(selectedDate, 'yyyy-MM-dd');
   
@@ -165,7 +194,7 @@ export default function Workout() {
     );
     
     const workout: WorkoutType = {
-      id: '', // Empty string - Supabase will generate UUID
+      id: isEditMode ? editWorkout.id : '', // Keep ID when editing, empty for new
       date: dateString,
       type: selectedType,
       sessionType: tssCalc.sessionType,
@@ -192,24 +221,29 @@ export default function Workout() {
     
     if (success) {
       toast({
-        title: 'Treino registrado!',
+        title: isEditMode ? 'Treino atualizado!' : 'Treino registrado!',
         description: `${selectedType === 'Rest' ? 'Dia de descanso' : `TSS: ${tssCalc.tssFinal} (${getTssMethodLabel(tssCalc.tssMethod)})`}`,
       });
       
-      // Reset form
-      setSelectedType(null);
-      setDuration(undefined);
-      setRpe(5);
-      setValidated(false);
-      setDistance(undefined);
-      setAvgHr(undefined);
-      setMuscleGroups([]);
-      setUseZoneTimes(false);
-      setTimeZ1(0);
-      setTimeZ2(0);
-      setTimeZ3(0);
-      setTimeZ4(0);
-      setTimeZ5(0);
+      if (isEditMode) {
+        // Go back to calendar after editing
+        navigate('/calendar', { replace: true });
+      } else {
+        // Reset form for new workout
+        setSelectedType(null);
+        setDuration(undefined);
+        setRpe(5);
+        setValidated(false);
+        setDistance(undefined);
+        setAvgHr(undefined);
+        setMuscleGroups([]);
+        setUseZoneTimes(false);
+        setTimeZ1(0);
+        setTimeZ2(0);
+        setTimeZ3(0);
+        setTimeZ4(0);
+        setTimeZ5(0);
+      }
     } else {
       toast({
         title: 'Erro ao salvar',
@@ -251,7 +285,7 @@ export default function Workout() {
   
   return (
     <PageContainer 
-      title="Registrar Treino" 
+      title={isEditMode ? "Editar Treino" : "Registrar Treino"} 
       subtitle={
         <Popover>
           <PopoverTrigger asChild>
@@ -638,7 +672,11 @@ export default function Workout() {
           className="w-full h-12 text-lg font-semibold"
           disabled={!selectedType || (useZoneTimes && !zoneTimesValid)}
         >
-          {selectedType === 'Rest' ? 'Registrar Descanso' : 'Salvar Treino'}
+          {selectedType === 'Rest' 
+            ? 'Registrar Descanso' 
+            : isEditMode 
+              ? 'Salvar Alterações' 
+              : 'Salvar Treino'}
         </Button>
       </form>
     </PageContainer>
