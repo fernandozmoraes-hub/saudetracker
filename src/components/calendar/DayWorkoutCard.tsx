@@ -4,6 +4,7 @@ import { Footprints, Dumbbell, Bike, Bed } from 'lucide-react';
 
 interface DayWorkoutCardProps {
   workout: Workout;
+  onClick?: () => void;
 }
 
 const workoutIcons = {
@@ -38,7 +39,7 @@ const getTssMethodBadgeClass = (method?: TssMethod): string => {
   }
 };
 
-export function DayWorkoutCard({ workout }: DayWorkoutCardProps) {
+export function DayWorkoutCard({ workout, onClick }: DayWorkoutCardProps) {
   const Icon = workoutIcons[workout.type] || Footprints;
   const colorClass = workoutColors[workout.type] || workoutColors.Run;
 
@@ -53,10 +54,14 @@ export function DayWorkoutCard({ workout }: DayWorkoutCardProps) {
   const tssClass = getTssMethodBadgeClass(workout.tssMethod);
 
   return (
-    <div className={cn(
-      "flex items-center gap-3 p-3 rounded-lg border",
-      colorClass
-    )}>
+    <div 
+      className={cn(
+        "flex items-center gap-3 p-3 rounded-lg border transition-all",
+        colorClass,
+        onClick && "cursor-pointer hover:scale-[1.02] hover:shadow-md active:scale-[0.98]"
+      )}
+      onClick={onClick}
+    >
       {/* Workout Icon */}
       <div className="w-10 h-10 rounded-lg bg-background/50 flex items-center justify-center">
         <Icon className="h-5 w-5" />

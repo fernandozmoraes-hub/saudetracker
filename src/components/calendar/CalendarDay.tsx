@@ -1,9 +1,11 @@
+import { useState } from 'react';
 import { format, isToday } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { DailyCheck, Workout } from '@/types/health';
 import { DayMetricsCard } from './DayMetricsCard';
 import { DayWorkoutCard } from './DayWorkoutCard';
+import { WorkoutDetailSheet } from './WorkoutDetailSheet';
 
 interface CalendarDayProps {
   date: Date;
@@ -12,6 +14,13 @@ interface CalendarDayProps {
 }
 
 export function CalendarDay({ date, dailyCheck, workouts }: CalendarDayProps) {
+  const [selectedWorkout, setSelectedWorkout] = useState<Workout | null>(null);
+  const [sheetOpen, setSheetOpen] = useState(false);
+
+  const handleWorkoutClick = (workout: Workout) => {
+    setSelectedWorkout(workout);
+    setSheetOpen(true);
+  };
   const isCurrentDay = isToday(date);
   const dayName = format(date, 'EEEE', { locale: ptBR });
   const dayNumber = format(date, 'd');
@@ -69,7 +78,11 @@ export function CalendarDay({ date, dailyCheck, workouts }: CalendarDayProps) {
       {workouts.length > 0 && (
         <div className="space-y-2">
           {workouts.map((workout) => (
-            <DayWorkoutCard key={workout.id} workout={workout} />
+            <DayWorkoutCard 
+              key={workout.id} 
+              workout={workout} 
+              onClick={() => handleWorkoutClick(workout)}
+            />
           ))}
         </div>
       )}
@@ -80,6 +93,13 @@ export function CalendarDay({ date, dailyCheck, workouts }: CalendarDayProps) {
           Sem registros
         </div>
       )}
+
+      {/* Workout Detail Sheet */}
+      <WorkoutDetailSheet 
+        workout={selectedWorkout}
+        open={sheetOpen}
+        onOpenChange={setSheetOpen}
+      />
     </div>
   );
 }
