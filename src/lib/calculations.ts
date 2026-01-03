@@ -424,6 +424,8 @@ export interface DailyTrendData {
   fullDate: string;    // 'yyyy-MM-dd'
   hrv: number | null;
   hrvBaseline: number;
+  ctl: number;
+  atl: number;
   tsb: number;
 }
 
@@ -448,6 +450,8 @@ export function get14DayTrend(dailyChecks: DailyCheck[], workouts: Workout[]): D
       fullDate: dateStr,
       hrv: check?.hrv ?? null,
       hrvBaseline: baseline,
+      ctl,
+      atl,
       tsb,
     });
   }

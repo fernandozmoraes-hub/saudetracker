@@ -1,7 +1,7 @@
 import { LineChart, Line, AreaChart, Area, XAxis, YAxis, ReferenceLine, ResponsiveContainer, Tooltip } from 'recharts';
 import { get14DayTrend, DailyTrendData } from '@/lib/calculations';
 import { useData } from '@/hooks/useData';
-import { Heart, TrendingUp } from 'lucide-react';
+import { Heart, TrendingUp, Activity } from 'lucide-react';
 
 export function TrendCharts() {
   const { dailyChecks, workouts } = useData();
@@ -51,17 +51,31 @@ export function TrendCharts() {
     return null;
   };
   
-  // Get TSB color based on value
-  const getTSBColor = (tsb: number) => {
-    if (tsb >= 0) return 'hsl(142, 76%, 45%)'; // status-ok
-    if (tsb >= -15) return 'hsl(45, 93%, 47%)'; // status-alert
-    return 'hsl(0, 72%, 51%)'; // status-critical
+  // Custom tooltip for CTL/ATL
+  const LoadTooltip = ({ active, payload, label }: any) => {
+    if (active && payload && payload.length) {
+      const ctl = payload.find((p: any) => p.dataKey === 'ctl')?.value;
+      const atl = payload.find((p: any) => p.dataKey === 'atl')?.value;
+      return (
+        <div className="bg-card border border-border rounded-lg px-3 py-2 shadow-lg">
+          <p className="text-xs text-muted-foreground">{label}</p>
+          <p className="text-sm font-semibold text-primary">CTL: {ctl}</p>
+          <p className="text-sm font-semibold text-status-alert">ATL: {atl}</p>
+        </div>
+      );
+    }
+    return null;
   };
   
   // Find min/max for TSB chart
   const tsbValues = data.map(d => d.tsb);
   const tsbMin = Math.min(...tsbValues, -20);
   const tsbMax = Math.max(...tsbValues, 10);
+  
+  // Find min/max for CTL/ATL chart
+  const ctlAtlValues = [...data.map(d => d.ctl), ...data.map(d => d.atl)];
+  const ctlAtlMin = Math.min(...ctlAtlValues, 0);
+  const ctlAtlMax = Math.max(...ctlAtlValues, 50);
   
   return (
     <div className="space-y-4 animate-slide-up">
@@ -113,6 +127,60 @@ export function TrendCharts() {
             Linha tracejada: baseline médio ({avgBaseline} ms)
           </p>
         )}
+      </div>
+      
+      {/* CTL/ATL Trend Chart */}
+      <div className="gradient-card rounded-xl p-4 border border-border/50">
+        <div className="flex items-center gap-2 mb-3">
+          <Activity className="w-4 h-4 text-primary" />
+          <span className="text-sm font-semibold">CTL / ATL - 14 dias</span>
+        </div>
+        <div className="h-40">
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={data} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
+              <XAxis 
+                dataKey="date" 
+                tick={{ fontSize: 10, fill: 'hsl(215, 20%, 55%)' }}
+                axisLine={{ stroke: 'hsl(222, 30%, 20%)' }}
+                tickLine={false}
+                interval="preserveStartEnd"
+              />
+              <YAxis 
+                tick={{ fontSize: 10, fill: 'hsl(215, 20%, 55%)' }}
+                axisLine={false}
+                tickLine={false}
+                domain={[Math.max(0, ctlAtlMin - 5), ctlAtlMax + 5]}
+              />
+              <Tooltip content={<LoadTooltip />} />
+              <Line 
+                type="monotone" 
+                dataKey="ctl" 
+                name="CTL"
+                stroke="hsl(174, 72%, 56%)" 
+                strokeWidth={2}
+                dot={{ fill: 'hsl(174, 72%, 56%)', strokeWidth: 0, r: 3 }}
+                activeDot={{ fill: 'hsl(174, 72%, 56%)', strokeWidth: 2, stroke: 'hsl(222, 47%, 11%)', r: 5 }}
+              />
+              <Line 
+                type="monotone" 
+                dataKey="atl" 
+                name="ATL"
+                stroke="hsl(45, 93%, 47%)" 
+                strokeWidth={2}
+                dot={{ fill: 'hsl(45, 93%, 47%)', strokeWidth: 0, r: 3 }}
+                activeDot={{ fill: 'hsl(45, 93%, 47%)', strokeWidth: 2, stroke: 'hsl(222, 47%, 11%)', r: 5 }}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+        <div className="flex justify-center gap-6 text-xs text-muted-foreground mt-2">
+          <span className="flex items-center gap-1">
+            <span className="w-3 h-0.5 bg-primary rounded" /> CTL (Fitness)
+          </span>
+          <span className="flex items-center gap-1">
+            <span className="w-3 h-0.5 bg-status-alert rounded" /> ATL (Fadiga)
+          </span>
+        </div>
       </div>
       
       {/* TSB Trend Chart */}
