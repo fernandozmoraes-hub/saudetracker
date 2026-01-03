@@ -305,6 +305,7 @@ export function calculateATL(date: string, workouts: Workout[]): number {
 /**
  * Calculate Chronic Training Load (CTL) - 42-day exponential moving average
  * TSS v2: Uses tssFinal directly, no HRV factor
+ * IMPORTANT: EMA must decay on rest days (TSS=0), not just workout days
  */
 export function calculateCTL(date: string, workouts: Workout[]): number {
   if (workouts.length === 0) return 0;
@@ -312,19 +313,21 @@ export function calculateCTL(date: string, workouts: Workout[]): number {
   const targetDate = new Date(date);
   const alpha = 2 / (42 + 1); // EMA decay factor
   
-  // Get all unique workout dates
-  const allDates = new Set(workouts.map(w => w.date));
-  const sortedDates = Array.from(allDates).sort();
-  if (sortedDates.length === 0) return 0;
+  // Find the earliest workout date to start the calculation
+  const sortedWorkoutDates = workouts.map(w => w.date).sort();
+  if (sortedWorkoutDates.length === 0) return 0;
   
-  // Initialize CTL with first week average
-  const firstWeekDates = sortedDates.slice(0, 7);
-  let ctl = firstWeekDates.reduce((sum, d) => sum + getDailyTssEffective(d, workouts), 0) / Math.max(firstWeekDates.length, 1);
+  const startDate = new Date(sortedWorkoutDates[0]);
   
-  // Calculate EMA up to target date
-  for (const dateStr of sortedDates) {
-    if (new Date(dateStr) > targetDate) break;
-    const tss = getDailyTssEffective(dateStr, workouts);
+  // Initialize CTL with first day's TSS
+  let ctl = getDailyTssEffective(sortedWorkoutDates[0], workouts);
+  
+  // Calculate EMA for EVERY day from start to target date (including rest days)
+  const daysDiff = Math.floor((targetDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+  
+  for (let i = 1; i <= daysDiff; i++) {
+    const currentDate = format(subDays(targetDate, daysDiff - i), 'yyyy-MM-dd');
+    const tss = getDailyTssEffective(currentDate, workouts); // Returns 0 for rest days
     ctl = alpha * tss + (1 - alpha) * ctl;
   }
   
