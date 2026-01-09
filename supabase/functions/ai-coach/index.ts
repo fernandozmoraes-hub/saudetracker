@@ -20,7 +20,7 @@ const WorkoutSchema = z.object({
 });
 
 const TodayDataSchema = z.object({
-  hrv: z.number().min(-300).max(300), // Aceita negativos temporariamente para dados legados
+  hrv: z.number().min(-300).max(300),
   hrvStatus: z.string().max(20),
   restingHr: z.number().min(20).max(250),
   sleepHours: z.number().min(0).max(24),
@@ -36,11 +36,13 @@ const TrainingLoadSchema = z.object({
 });
 
 const TrendsSchema = z.object({
-  hrvBaseline7d: z.number().min(-300).max(300), // Aceita negativos para dados legados
-  hrvVsBaseline: z.number().min(-500).max(500), // Pode variar muito quando baseline é baixo
+  hrvBaseline7d: z.number().min(-300).max(300),
+  hrvVsBaseline: z.number().min(-500).max(500),
   consecutiveCriticalDays: z.number().min(0).max(365),
   consecutiveLowSleepDays: z.number().min(0).max(365),
   atlTrend5d: z.string().max(20),
+  tssYesterday: z.number().min(0).max(500).optional(),
+  tss7d: z.number().min(0).max(3500).optional(),
 });
 
 const AnalysisDataSchema = z.object({
@@ -48,6 +50,7 @@ const AnalysisDataSchema = z.object({
   trainingLoad: TrainingLoadSchema,
   trends: TrendsSchema,
   recentWorkouts: z.array(WorkoutSchema).max(30),
+  dayOfWeek: z.string().max(20).optional(),
 });
 
 const TriggerResultSchema = z.object({
@@ -60,46 +63,101 @@ const RequestBodySchema = z.object({
   triggerResult: TriggerResultSchema,
 });
 
-const SYSTEM_PROMPT = `Você é um treinador experiente em atletas master (50+), especializado em saúde, longevidade e progressão sustentável.
+const SYSTEM_PROMPT = `Você é um Coach Inteligente de Performance baseado em métricas fisiológicas. Seu comportamento segue princípios similares aos adotados pelo TrainingPeaks, WKO5 e HRV4Training.
 
-MODELO DE CARGA HÍBRIDO (v2):
-O sistema utiliza um modelo híbrido para calcular TSS (Training Stress Score):
-- **Endurance (Corrida, Bike)**: TSS calculado via HR-TSS quando FC média está disponível, usando a fórmula baseada no LTHR (limiar de lactato) do atleta. Caso contrário, usa RPE-TSS.
-- **Força (Musculação)**: TSS calculado via RPE-TSS com fator de validação (×0.7 se o atleta não completou todos os sets planejados).
-- O HRV NÃO é usado para modificar a carga de treino. O HRV serve apenas como indicador de recuperação e status fisiológico.
+## SEU PAPEL:
+- Interpretar dados fisiológicos (HRV, TSB, CTL, ATL, TSS)
+- Recomendar o treino ideal para hoje
+- Planejar a semana automaticamente
+- Ajustar o planejamento sempre que houver variações significativas na recuperação
 
-IMPORTANTE - REGRAS OBRIGATÓRIAS:
-- Você NÃO deve classificar risco
-- Você NÃO deve usar termos como "Alto Risco", "Seguro", "Atenção", "🟢", "🟡", "🔴"
-- A classificação do dia já foi definida pelo sistema e será fornecida a você como "STATUS DO DIA"
-- Nunca contradiga o status recebido
-- Nunca gere uma nova classificação
-- Nunca use emojis de cores/risco
+## LÓGICA DE AVALIAÇÃO FISIOLÓGICA
 
-Seu papel é APENAS:
-- Interpretar HRV, sono, FC de repouso como indicadores de recuperação (não de carga)
-- Analisar carga de treino (TSS, ATL, CTL, TSB) considerando o modelo híbrido
-- Explicar o contexto fisiológico do dia baseado no status recebido
-- Apontar pontos positivos e pontos de atenção nos dados
-- Sugerir foco geral (ex: recuperação, manutenção, cautela)
-- Comentar decisões acertadas ou sinais que merecem observação
-- Se houver treinos com HR-TSS (v2_hybrid), comentar a precisão adicional da medição
+### HRV:
+- HRV_atual > Média_HRV_7d → recuperado
+- HRV_atual ≈ média (±5%) → normal
+- HRV_atual < média → alerta e redução de intensidade
 
-Formato da resposta:
-- 1 parágrafo curto (3–5 linhas)
-- Linguagem clara, objetiva e técnica
-- Sem motivação genérica
-- Sem termos vagos
-- Foque na explicação dos dados, não na classificação
+### TSB:
+- TSB > +10 → muito fresco
+- TSB entre +5 e -5 → ideal
+- TSB < -10 → fadiga acumulada
 
-O objetivo é apoiar decisões conscientes, preservar saúde e permitir evolução consistente ao longo do tempo.`;
+### Combinação HRV + TSB:
+- HRV baixo + TSB negativo = risco fisiológico
+- HRV ok + TSB neutro = manter progresso
+- HRV alto + TSB positivo = apto para intensidade
 
-const statusLabels: Record<string, string> = {
-  safe: 'SEGURO',
-  attention: 'ATENÇÃO',
-  risk: 'ALTO RISCO',
-  blocked: 'BLOQUEADO'
-};
+## REGRAS DE DECISÃO DO TREINO DO DIA
+
+### Treino leve (Z1–Z2) quando:
+- TSB < -10
+- HRV abaixo da média
+- 3 dias seguidos de TSS alto
+- Pouco tempo disponível
+
+### Treino moderado (Z2–Z3) quando:
+- TSB entre +5 e -5
+- HRV na média
+- Últimos dias equilibrados
+
+### Treino intenso (Z3–Z5) quando:
+- TSB > +5
+- HRV acima da média
+- Descanso adequado nas últimas 48h
+
+Se qualquer condição falhar → voltar para leve/moderado.
+
+## ESTRUTURA SEMANAL PARA ENDURANCE (padrão):
+- 2 sessões Z2 longas
+- 1 sessão Z3 tempo
+- 2 sessões Z1 regenerativas
+- 1 sessão Z4/Z5 dependendo de HRV e TSB
+- 1 dia livre ou regenerativo
+
+## AJUSTES AUTOMÁTICOS DO PLANO SEMANAL:
+
+- Se HRV cair abaixo da média: reduzir intensidade, mover treino intenso
+- Se TSB < -10: cortar treino intenso, priorizar recuperação ativa
+- Se TSB > +10: abrir oportunidade de intensidade
+- Se usuário perder um treino: recalcular para evitar sobrecarga
+- Se usuário treinar mais que planejado: reduzir volume dos próximos 1–2 dias
+
+## FORMATO DE RESPOSTA OBRIGATÓRIO
+
+Você DEVE responder SEMPRE com exatamente 2 blocos separados:
+
+### BLOCO 1: AVALIAÇÃO DO DIA
+
+STATUS FISIOLÓGICO
+HRV: [classificação - recuperado/normal/baixo]
+TSB: [classificação - fresco/ideal/fadigado]
+CTL/ATL: [interpretação breve]
+
+RECOMENDAÇÃO DO DIA
+Tipo: [leve/moderado/intenso]
+Tempo sugerido: [XX] minutos
+Zona de FC: [Z1/Z2/Z3/Z4/Z5]
+TSS estimado: [XX] pontos
+Justificativa fisiológica: [explicação objetiva em 1-2 linhas]
+
+### BLOCO 2: PLANEJAMENTO SEMANAL
+
+PLANO SEMANAL
+Segunda: [treino + zona + duração + TSS estimado]
+Terça: [treino + zona + duração + TSS estimado]
+Quarta: [treino + zona + duração + TSS estimado]
+Quinta: [treino + zona + duração + TSS estimado]
+Sexta: [treino + zona + duração + TSS estimado]
+Sábado: [treino + zona + duração + TSS estimado]
+Domingo: [treino + zona + duração + TSS estimado]
+
+## REGRAS FINAIS:
+- Nunca recomendar treino intenso com HRV baixo + TSB negativo
+- Nunca sugerir dois dias intensos consecutivos
+- Sempre estimar o TSS do treino
+- Se houver falta de dados, assumir abordagem conservadora (Z1/Z2)
+- Respostas devem ser técnicas e objetivas, sem motivação genérica`;
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -107,7 +165,6 @@ serve(async (req) => {
   }
 
   try {
-    // Parse and validate input
     const rawBody = await req.json();
     const parseResult = RequestBodySchema.safeParse(rawBody);
     
@@ -126,7 +183,6 @@ serve(async (req) => {
     
     console.log('AI Coach request received:', { triggerResult });
     
-    // If blocked, return default message
     if (triggerResult.classification === 'blocked') {
       console.log('Request blocked due to insufficient data');
       return new Response(JSON.stringify({ 
@@ -143,48 +199,60 @@ serve(async (req) => {
       throw new Error("LOVABLE_API_KEY is not configured");
     }
 
-    // Build the user prompt with the data - STATUS is pre-defined by triggers
-    const userPrompt = `**STATUS DO DIA (PRÉ-DEFINIDO PELO SISTEMA): ${statusLabels[triggerResult.classification]}**
-${triggerResult.reasons.length > 0 ? `Motivos do sistema: ${triggerResult.reasons.join(', ')}` : ''}
+    // Calculate HRV status
+    const hrvVsBaseline = analysisData.trends.hrvVsBaseline;
+    let hrvClassification = 'normal';
+    if (hrvVsBaseline > 5) hrvClassification = 'acima da média (recuperado)';
+    else if (hrvVsBaseline < -5) hrvClassification = 'abaixo da média (alerta)';
+    
+    // TSB status
+    const tsb = analysisData.trainingLoad.tsb;
+    let tsbClassification = 'ideal';
+    if (tsb > 10) tsbClassification = 'muito fresco';
+    else if (tsb > 5) tsbClassification = 'fresco';
+    else if (tsb < -10) tsbClassification = 'fadiga acumulada';
+    else if (tsb < -5) tsbClassification = 'leve fadiga';
 
-Analise os seguintes dados do atleta e forneça contexto fisiológico para o status acima:
+    const userPrompt = `Analise os dados do atleta e forneça a avaliação do dia + planejamento semanal:
 
-**Dados de hoje:**
-- HRV: ${analysisData.today.hrv} ms (Status: ${analysisData.today.hrvStatus})
-- FC de repouso: ${analysisData.today.restingHr} bpm
-- Sono: ${analysisData.today.sleepHours}h (Qualidade: ${analysisData.today.sleepQuality}/5)
-${analysisData.today.bodyBattery ? `- Body Battery: ${analysisData.today.bodyBattery}/100` : ''}
-${analysisData.today.mood ? `- Humor: ${analysisData.today.mood}/5` : ''}
+## DADOS DE ENTRADA
+
+**Dia da Semana:** ${analysisData.dayOfWeek || 'Não informado'}
+
+**HRV:**
+- HRV_atual: ${analysisData.today.hrv} ms
+- Média_HRV_7d: ${analysisData.trends.hrvBaseline7d} ms
+- HRV vs Baseline: ${hrvVsBaseline > 0 ? '+' : ''}${hrvVsBaseline.toFixed(1)}%
+- Classificação: ${hrvClassification}
 
 **Carga de Treino:**
-- ATL (Fadiga aguda 7d): ${analysisData.trainingLoad.atl}
-- CTL (Fitness crônico 42d): ${analysisData.trainingLoad.ctl}
-- TSB (Form): ${analysisData.trainingLoad.tsb}
+- TSS_ontem: ${analysisData.trends.tssYesterday ?? 'N/A'}
+- TSS_7d: ${analysisData.trends.tss7d ?? 'N/A'}
+- TSB_atual: ${tsb.toFixed(1)} (${tsbClassification})
+- CTL_atual: ${analysisData.trainingLoad.ctl.toFixed(1)}
+- ATL_atual: ${analysisData.trainingLoad.atl.toFixed(1)}
+
+**Recuperação:**
+- Sono: ${analysisData.today.sleepHours}h (Qualidade: ${analysisData.today.sleepQuality}/5)
+- FC de repouso: ${analysisData.today.restingHr} bpm
+${analysisData.today.bodyBattery ? `- Body Battery: ${analysisData.today.bodyBattery}/100` : ''}
+- Dias consecutivos com HRV baixo: ${analysisData.trends.consecutiveCriticalDays}
+- Dias consecutivos com sono < 6h: ${analysisData.trends.consecutiveLowSleepDays}
 
 **Tendências:**
-- Baseline HRV 7d: ${analysisData.trends.hrvBaseline7d} ms
-- HRV vs Baseline: ${analysisData.trends.hrvVsBaseline > 0 ? '+' : ''}${analysisData.trends.hrvVsBaseline.toFixed(1)}%
-- Dias consecutivos com HRV Critical: ${analysisData.trends.consecutiveCriticalDays}
-- Dias consecutivos com sono < 6h: ${analysisData.trends.consecutiveLowSleepDays}
 - Tendência ATL 5d: ${analysisData.trends.atlTrend5d}
 
-**Treinos recentes (últimos 7 dias) - Modelo Híbrido v2:**
+**Histórico de Treinos (últimos 7 dias):**
 ${analysisData.recentWorkouts.length > 0 
   ? analysisData.recentWorkouts.map((w: any) => {
       const tss = w.tssFinal ?? w.tssSubjective;
-      const version = w.tssVersion === 'v2_hybrid' ? 'HR-TSS' : 'RPE-TSS';
-      const hrInfo = w.avgHr ? `, FC ${w.avgHr}bpm` : '';
-      return `- ${w.date}: ${w.type}, ${w.durationMin}min, RPE ${w.rpe}${hrInfo}, TSS ${tss} (${version})`;
+      return `- ${w.date}: ${w.type}, ${w.durationMin}min, RPE ${w.rpe}, TSS ${tss}`;
     }).join('\n')
   : '- Nenhum treino registrado'}
 
-**Nota sobre o modelo de carga:**
-- TSS de endurance com FC: calculado via HR-TSS (mais preciso)
-- TSS de endurance sem FC: calculado via RPE-TSS
-- TSS de força: calculado via RPE-TSS com fator de validação
-- HRV é usado apenas como indicador de recuperação, não modifica a carga
+**Objetivo:** Endurance (padrão)
 
-Forneça sua análise contextual, explicando os dados sem reclassificar o status.`;
+Forneça a AVALIAÇÃO DO DIA e o PLANEJAMENTO SEMANAL no formato especificado.`;
 
     console.log('Calling Lovable AI Gateway...');
     

@@ -1,6 +1,7 @@
 import { format, subDays } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 import { DailyCheck, Workout } from '@/types/health';
-import { getHRVMetrics, calculateATL, calculateCTL, getHRVBaseline7d } from './calculations';
+import { getHRVMetrics, calculateATL, calculateCTL, getHRVBaseline7d, getDailyTssEffective } from './calculations';
 import { AnalysisData, TriggerResult, evaluateTriggers } from './triggers';
 
 export function buildAnalysisData(dailyChecks: DailyCheck[], workouts: Workout[]): { data: AnalysisData | null; triggerResult: TriggerResult } {
@@ -25,6 +26,17 @@ export function buildAnalysisData(dailyChecks: DailyCheck[], workouts: Workout[]
   const ctl = calculateCTL(today, workouts);
   const tsb = ctl - atl;
   const baseline = getHRVBaseline7d(today, dailyChecks);
+  
+  // Calculate TSS yesterday
+  const yesterday = format(subDays(new Date(), 1), 'yyyy-MM-dd');
+  const tssYesterday = getDailyTssEffective(yesterday, workouts);
+  
+  // Calculate TSS last 7 days
+  let tss7d = 0;
+  for (let i = 0; i < 7; i++) {
+    const checkDate = format(subDays(new Date(), i), 'yyyy-MM-dd');
+    tss7d += getDailyTssEffective(checkDate, workouts);
+  }
   
   // Calculate consecutive critical days
   let consecutiveCriticalDays = 0;
@@ -76,6 +88,10 @@ export function buildAnalysisData(dailyChecks: DailyCheck[], workouts: Workout[]
     ? ((todayCheck.hrv - baseline) / baseline) * 100 
     : 0;
   
+  // Get day of week in Portuguese
+  const dayOfWeek = format(new Date(), 'EEEE', { locale: ptBR });
+  const capitalizedDay = dayOfWeek.charAt(0).toUpperCase() + dayOfWeek.slice(1);
+  
   const analysisData: AnalysisData = {
     today: {
       hrv: todayCheck.hrv,
@@ -97,8 +113,11 @@ export function buildAnalysisData(dailyChecks: DailyCheck[], workouts: Workout[]
       consecutiveCriticalDays,
       consecutiveLowSleepDays,
       atlTrend5d,
+      tssYesterday,
+      tss7d,
     },
     recentWorkouts,
+    dayOfWeek: capitalizedDay,
   };
   
   const triggerResult = evaluateTriggers(analysisData);
