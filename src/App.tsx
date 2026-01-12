@@ -17,6 +17,7 @@ import Calendar from "./pages/Calendar";
 import History from "./pages/History";
 import Settings from "./pages/Settings";
 import Install from "./pages/Install";
+import WorkoutReview from "./pages/WorkoutReview";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -40,6 +41,7 @@ const App = () => (
                   <Route path="/calendar" element={<ProtectedRoute><Calendar /></ProtectedRoute>} />
                   <Route path="/history" element={<ProtectedRoute><History /></ProtectedRoute>} />
                   <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+                  <Route path="/workout-review" element={<ProtectedRoute><WorkoutReview /></ProtectedRoute>} />
                   <Route path="/install" element={<Install />} />
                   <Route path="*" element={<NotFound />} />
                 </Routes>

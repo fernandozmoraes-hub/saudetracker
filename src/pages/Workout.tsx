@@ -681,6 +681,16 @@ export default function Workout() {
               ? 'Salvar Alterações' 
               : 'Salvar Treino'}
         </Button>
+
+        {/* Link to Workout Review */}
+        <div className="pt-4 border-t border-border">
+          <Link to="/workout-review">
+            <Button variant="outline" className="w-full">
+              <Activity className="w-4 h-4 mr-2" />
+              Avaliar Treinos Anteriores
+            </Button>
+          </Link>
+        </div>
       </form>
     </PageContainer>
   );
