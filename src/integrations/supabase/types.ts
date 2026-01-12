@@ -140,6 +140,65 @@ export type Database = {
         }
         Relationships: []
       }
+      workout_evaluations: {
+        Row: {
+          created_at: string
+          efficiency_quality: string | null
+          feeling_after: string | null
+          follow_up_qa: Json | null
+          general_suggestions: string | null
+          id: string
+          max_hr: number | null
+          observations: string | null
+          pain_discomfort: string | null
+          risks_redflags: string | null
+          summary_technical: string | null
+          updated_at: string
+          user_id: string
+          workout_id: string
+        }
+        Insert: {
+          created_at?: string
+          efficiency_quality?: string | null
+          feeling_after?: string | null
+          follow_up_qa?: Json | null
+          general_suggestions?: string | null
+          id?: string
+          max_hr?: number | null
+          observations?: string | null
+          pain_discomfort?: string | null
+          risks_redflags?: string | null
+          summary_technical?: string | null
+          updated_at?: string
+          user_id: string
+          workout_id: string
+        }
+        Update: {
+          created_at?: string
+          efficiency_quality?: string | null
+          feeling_after?: string | null
+          follow_up_qa?: Json | null
+          general_suggestions?: string | null
+          id?: string
+          max_hr?: number | null
+          observations?: string | null
+          pain_discomfort?: string | null
+          risks_redflags?: string | null
+          summary_technical?: string | null
+          updated_at?: string
+          user_id?: string
+          workout_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workout_evaluations_workout_id_fkey"
+            columns: ["workout_id"]
+            isOneToOne: false
+            referencedRelation: "workouts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workouts: {
         Row: {
           avg_hr: number | null

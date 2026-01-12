@@ -8,3 +8,6 @@ verify_jwt = false
 
 [functions.strava-import]
 verify_jwt = true
+
+[functions.workout-evaluator]
+verify_jwt = true
