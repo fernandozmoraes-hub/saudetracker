@@ -21,11 +21,8 @@ export interface AnalysisData {
     consecutiveCriticalDays: number;
     consecutiveLowSleepDays: number;
     atlTrend5d: 'increasing' | 'stable' | 'decreasing';
-    tssYesterday?: number;
-    tss7d?: number;
   };
   recentWorkouts: Workout[];
-  dayOfWeek?: string;
 }
 
 export interface TriggerResult {
