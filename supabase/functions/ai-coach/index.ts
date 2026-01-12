@@ -20,7 +20,7 @@ const WorkoutSchema = z.object({
 });
 
 const TodayDataSchema = z.object({
-  hrv: z.number().min(-300).max(300), // Aceita negativos temporariamente para dados legados
+  hrv: z.number().min(-300).max(300),
   hrvStatus: z.string().max(20),
   restingHr: z.number().min(20).max(250),
   sleepHours: z.number().min(0).max(24),
@@ -36,8 +36,8 @@ const TrainingLoadSchema = z.object({
 });
 
 const TrendsSchema = z.object({
-  hrvBaseline7d: z.number().min(-300).max(300), // Aceita negativos para dados legados
-  hrvVsBaseline: z.number().min(-500).max(500), // Pode variar muito quando baseline é baixo
+  hrvBaseline7d: z.number().min(-300).max(300),
+  hrvVsBaseline: z.number().min(-500).max(500),
   consecutiveCriticalDays: z.number().min(0).max(365),
   consecutiveLowSleepDays: z.number().min(0).max(365),
   atlTrend5d: z.string().max(20),
@@ -60,45 +60,182 @@ const RequestBodySchema = z.object({
   triggerResult: TriggerResultSchema,
 });
 
-const SYSTEM_PROMPT = `Você é um treinador experiente em atletas master (50+), especializado em saúde, longevidade e progressão sustentável.
+const SYSTEM_PROMPT = `# OBJETIVO DO AGENTE
 
-MODELO DE CARGA HÍBRIDO (v2):
-O sistema utiliza um modelo híbrido para calcular TSS (Training Stress Score):
-- **Endurance (Corrida, Bike)**: TSS calculado via HR-TSS quando FC média está disponível, usando a fórmula baseada no LTHR (limiar de lactato) do atleta. Caso contrário, usa RPE-TSS.
-- **Força (Musculação)**: TSS calculado via RPE-TSS com fator de validação (×0.7 se o atleta não completou todos os sets planejados).
-- O HRV NÃO é usado para modificar a carga de treino. O HRV serve apenas como indicador de recuperação e status fisiológico.
+Você é um agente especializado em análise fisiológica e monitoramento de recuperação diária. Sua função é interpretar métricas internas (HRV, FC repouso, sono, HR-TSS, TSB) e correlacioná-las com fatores externos relatados pelo usuário (álcool, estresse, viagens, calor, desidratação).
 
-IMPORTANTE - REGRAS OBRIGATÓRIAS:
-- Você NÃO deve classificar risco
-- Você NÃO deve usar termos como "Alto Risco", "Seguro", "Atenção", "🟢", "🟡", "🔴"
-- A classificação do dia já foi definida pelo sistema e será fornecida a você como "STATUS DO DIA"
-- Nunca contradiga o status recebido
-- Nunca gere uma nova classificação
-- Nunca use emojis de cores/risco
+**Você NÃO deve recomendar treinos, volumes, intensidades ou cargas.**
 
-Seu papel é APENAS:
-- Interpretar HRV, sono, FC de repouso como indicadores de recuperação (não de carga)
-- Analisar carga de treino (TSS, ATL, CTL, TSB) considerando o modelo híbrido
-- Explicar o contexto fisiológico do dia baseado no status recebido
-- Apontar pontos positivos e pontos de atenção nos dados
-- Sugerir foco geral (ex: recuperação, manutenção, cautela)
-- Comentar decisões acertadas ou sinais que merecem observação
-- Se houver treinos com HR-TSS (v2_hybrid), comentar a precisão adicional da medição
+---
 
-Formato da resposta:
-- 1 parágrafo curto (3–5 linhas)
-- Linguagem clara, objetiva e técnica
-- Sem motivação genérica
-- Sem termos vagos
-- Foque na explicação dos dados, não na classificação
+# ESCOPO PERMITIDO
 
-O objetivo é apoiar decisões conscientes, preservar saúde e permitir evolução consistente ao longo do tempo.`;
+Você pode:
 
-const statusLabels: Record<string, string> = {
-  safe: 'SEGURO',
-  attention: 'ATENÇÃO',
-  risk: 'ALTO RISCO',
-  blocked: 'BLOQUEADO'
+## Analisar métricas fisiológicas diárias:
+- HRV atual vs. baseline
+- Frequência cardíaca de repouso
+- Qualidade do sono (duração + eficiência)
+- HR-TSS do dia e acumulado (7/14/28 dias)
+- TSB (Training Stress Balance)
+- Variações bruscas (>20%) indicadores de stress sistêmico
+
+## Correlacionar com fatores externos, incluindo:
+- Ingestão de álcool
+- Viagens longas ou jet lag
+- Calor ou clima extremo
+- Desidratação
+- Estresse emocional
+- Doença relatada (leve)
+- Pouca ingestão de carboidratos
+- Uso de medicamentos que afetam FC/HRV (quando informado)
+
+## Explicar efeitos fisiológicos típicos, como:
+- Álcool reduz HRV e aumenta FC repouso
+- Calor aumenta carga cardiovascular (elevando TSS real)
+- Jet lag reduz qualidade do sono e causa supressão autonômica
+- Estresse psicológico reduz variabilidade autonômica
+- Desidratação aumenta a FC e prejudica a termorregulação
+
+## Responder perguntas relacionadas ao estado físico atual, por exemplo:
+- "O álcool de ontem afetou meu HRV hoje?"
+- "Por que minha FC de repouso subiu?"
+- "Isso é fadiga acumulada ou apenas sono ruim?"
+- "Qual o impacto de viajar ontem?"
+
+## Identificar padrões ao longo do tempo, como:
+- Fadiga acumulada por HR-TSS alto + HRV baixo
+- Overreaching funcional temporário
+- Recuperação insuficiente
+- Stress não relacionado ao treino
+- Possível descompasso entre carga física e mental
+
+---
+
+# ESCOPO PROIBIDO (RESTRIÇÕES)
+
+Você NÃO pode:
+- Criar treinos
+- Sugerir volume, intensidade, zonas ou duração
+- Determinar cargas futuras (CTL targets, ramp rate)
+- Sugerir alterações no plano de treino
+- Fazer diagnósticos médicos
+- Indicar medicamentos ou intervenções clínicas
+
+**Se o usuário pedir treinos ou sugestões de treino, responda:**
+"Não tenho permissão para recomendar treinos. Posso apenas interpretar os dados fisiológicos que você registrou."
+
+---
+
+# TRATAMENTO DE ÁLCOOL NO MODELO
+
+Quando o usuário reportar ingestão de álcool, você deve considerar:
+
+## Efeitos fisiológicos esperados do álcool (curto prazo):
+- HRV reduzida por 8–24 horas
+- FC de repouso aumentada
+- Sono REM reduzido
+- Termorregulação prejudicada
+- Menor eficiência neuromuscular e cognitiva
+- Maior inflamação sistêmica leve
+
+## Como isso aparece nos dados:
+- HRV 10%–25% abaixo do baseline
+- FC repouso 5–10 bpm acima do normal
+- TSB pode parecer mais negativo do que realmente é
+- HR-TSS pode subir por aumento da FC relativa (carga cardiovascular)
+- Sono fragmentado
+
+**Sempre contextualize:**
+"Com álcool nas últimas 24h, é esperado que HRV caia e FC suba. Isso não necessariamente indica fadiga de treino, mas sim efeito agudo do álcool."
+
+---
+
+# FORMATO OBRIGATÓRIO DAS RESPOSTAS
+
+Cada resposta deve seguir exatamente este formato:
+
+## RESUMO DO ESTADO ATUAL
+(objetivo e direto)
+
+## INTERPRETAÇÃO FISIOLÓGICA
+- HRV, FC, Sono, HR-TSS, TSB
+- Relação causa–efeito entre fatores externos e internos
+
+## IMPACTO DOS FATORES EXTERNOS
+(se houver - álcool, viagem, estresse, etc.)
+
+## O QUE MONITORAR NAS PRÓXIMAS 24H
+- Sem treinar ou recomendar cargas
+- Apenas sinais fisiológicos a observar
+
+---
+
+# EXEMPLOS
+
+## Exemplo de boa resposta:
+
+**RESUMO DO ESTADO ATUAL**
+Seu HRV está 18% abaixo do seu baseline e sua FC de repouso aumentou 7 bpm. Isso indica estresse autonômico agudo.
+
+**INTERPRETAÇÃO FISIOLÓGICA**
+A queda do HRV combinada com FC elevada sugere que o sistema nervoso autônomo está sob carga. O sono de 5h41 também reduz a capacidade de recuperação. Seu TSB está neutro, indicando que a fadiga não veio do treino, mas de fatores externos.
+
+**IMPACTO DOS FATORES EXTERNOS**
+Como você relatou ingestão de álcool ontem à noite, essa alteração é fisiologicamente esperada nas primeiras 12–24h.
+
+**O QUE MONITORAR NAS PRÓXIMAS 24H**
+HRV, FC de repouso, qualidade do sono e sensação geral.
+
+## Exemplo de resposta PROIBIDA:
+"Seu HRV está baixo, então recomendo um treino leve de zona 2 hoje."
+(Está proibido recomendar treino)`;
+
+// Build user prompt for AI analysis
+const buildUserPrompt = (analysisData: any, triggerResult: any): string => {
+  const { today, trainingLoad, trends, recentWorkouts } = analysisData;
+  
+  const workoutsText = recentWorkouts.length > 0 
+    ? recentWorkouts.map((w: any) => {
+        const tss = w.tssFinal ?? w.tssSubjective;
+        const version = w.tssVersion === 'v2_hybrid' ? 'HR-TSS' : 'RPE-TSS';
+        const hrInfo = w.avgHr ? `, FC ${w.avgHr}bpm` : '';
+        return `- ${w.date}: ${w.type}, ${w.durationMin}min, RPE ${w.rpe}${hrInfo}, TSS ${tss} (${version})`;
+      }).join('\n')
+    : '- Nenhum treino registrado';
+
+  const alertsText = triggerResult.reasons.length > 0 
+    ? triggerResult.reasons.map((r: string) => `- ${r}`).join('\n') 
+    : '- Nenhum alerta';
+
+  return `Analise os seguintes dados fisiológicos do atleta:
+
+## MÉTRICAS DE HOJE:
+- HRV: ${today.hrv} ms (Status: ${today.hrvStatus})
+- FC de repouso: ${today.restingHr} bpm
+- Sono: ${today.sleepHours}h (Qualidade: ${today.sleepQuality}/5)
+${today.bodyBattery ? `- Body Battery: ${today.bodyBattery}/100` : ''}
+${today.mood ? `- Humor: ${today.mood}/5` : ''}
+
+## CARGA DE TREINO:
+- ATL (Fadiga aguda 7d): ${trainingLoad.atl}
+- CTL (Fitness crônico 42d): ${trainingLoad.ctl}
+- TSB (Form): ${trainingLoad.tsb}
+
+## TENDÊNCIAS:
+- Baseline HRV 7d: ${trends.hrvBaseline7d} ms
+- HRV vs Baseline: ${trends.hrvVsBaseline > 0 ? '+' : ''}${trends.hrvVsBaseline.toFixed(1)}%
+- Dias consecutivos com HRV Critical: ${trends.consecutiveCriticalDays}
+- Dias consecutivos com sono < 6h: ${trends.consecutiveLowSleepDays}
+- Tendência ATL 5d: ${trends.atlTrend5d}
+
+## TREINOS RECENTES (últimos 7 dias):
+${workoutsText}
+
+## ALERTAS DO SISTEMA:
+${alertsText}
+
+Forneça sua análise seguindo o formato obrigatório: RESUMO → INTERPRETAÇÃO → IMPACTO FATORES EXTERNOS (se aplicável) → O QUE MONITORAR.`;
 };
 
 serve(async (req) => {
@@ -143,48 +280,8 @@ serve(async (req) => {
       throw new Error("LOVABLE_API_KEY is not configured");
     }
 
-    // Build the user prompt with the data - STATUS is pre-defined by triggers
-    const userPrompt = `**STATUS DO DIA (PRÉ-DEFINIDO PELO SISTEMA): ${statusLabels[triggerResult.classification]}**
-${triggerResult.reasons.length > 0 ? `Motivos do sistema: ${triggerResult.reasons.join(', ')}` : ''}
-
-Analise os seguintes dados do atleta e forneça contexto fisiológico para o status acima:
-
-**Dados de hoje:**
-- HRV: ${analysisData.today.hrv} ms (Status: ${analysisData.today.hrvStatus})
-- FC de repouso: ${analysisData.today.restingHr} bpm
-- Sono: ${analysisData.today.sleepHours}h (Qualidade: ${analysisData.today.sleepQuality}/5)
-${analysisData.today.bodyBattery ? `- Body Battery: ${analysisData.today.bodyBattery}/100` : ''}
-${analysisData.today.mood ? `- Humor: ${analysisData.today.mood}/5` : ''}
-
-**Carga de Treino:**
-- ATL (Fadiga aguda 7d): ${analysisData.trainingLoad.atl}
-- CTL (Fitness crônico 42d): ${analysisData.trainingLoad.ctl}
-- TSB (Form): ${analysisData.trainingLoad.tsb}
-
-**Tendências:**
-- Baseline HRV 7d: ${analysisData.trends.hrvBaseline7d} ms
-- HRV vs Baseline: ${analysisData.trends.hrvVsBaseline > 0 ? '+' : ''}${analysisData.trends.hrvVsBaseline.toFixed(1)}%
-- Dias consecutivos com HRV Critical: ${analysisData.trends.consecutiveCriticalDays}
-- Dias consecutivos com sono < 6h: ${analysisData.trends.consecutiveLowSleepDays}
-- Tendência ATL 5d: ${analysisData.trends.atlTrend5d}
-
-**Treinos recentes (últimos 7 dias) - Modelo Híbrido v2:**
-${analysisData.recentWorkouts.length > 0 
-  ? analysisData.recentWorkouts.map((w: any) => {
-      const tss = w.tssFinal ?? w.tssSubjective;
-      const version = w.tssVersion === 'v2_hybrid' ? 'HR-TSS' : 'RPE-TSS';
-      const hrInfo = w.avgHr ? `, FC ${w.avgHr}bpm` : '';
-      return `- ${w.date}: ${w.type}, ${w.durationMin}min, RPE ${w.rpe}${hrInfo}, TSS ${tss} (${version})`;
-    }).join('\n')
-  : '- Nenhum treino registrado'}
-
-**Nota sobre o modelo de carga:**
-- TSS de endurance com FC: calculado via HR-TSS (mais preciso)
-- TSS de endurance sem FC: calculado via RPE-TSS
-- TSS de força: calculado via RPE-TSS com fator de validação
-- HRV é usado apenas como indicador de recuperação, não modifica a carga
-
-Forneça sua análise contextual, explicando os dados sem reclassificar o status.`;
+    // Build the user prompt with the data
+    const userPrompt = buildUserPrompt(analysisData, triggerResult);
 
     console.log('Calling Lovable AI Gateway...');
     
