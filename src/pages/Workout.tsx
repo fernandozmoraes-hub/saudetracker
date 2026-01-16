@@ -92,7 +92,9 @@ export default function Workout() {
   // Populate form when editing
   useEffect(() => {
     if (editWorkout) {
-      setSelectedDate(new Date(editWorkout.date));
+      // Parse date in local timezone to avoid UTC offset issues
+      const [year, month, day] = editWorkout.date.split('-').map(Number);
+      setSelectedDate(new Date(year, month - 1, day));
       setSelectedType(editWorkout.type);
       setDuration(editWorkout.durationMin || undefined);
       setRpe(editWorkout.rpe || 5);
@@ -260,7 +262,9 @@ export default function Workout() {
   };
 
   const handleStravaImport = (activity: StravaActivityDetails) => {
-    setSelectedDate(new Date(activity.date));
+    // Parse date in local timezone to avoid UTC offset issues
+    const [year, month, day] = activity.date.split('-').map(Number);
+    setSelectedDate(new Date(year, month - 1, day));
     setSelectedType(activity.type as WorkoutTypeEnum);
     setDuration(activity.durationMin);
     setDistance(activity.distanceKm || undefined);
