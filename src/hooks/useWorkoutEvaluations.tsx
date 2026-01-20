@@ -113,7 +113,7 @@ export function useWorkoutEvaluations() {
   const evaluateWorkout = useCallback(async (
     input: EvaluationInput,
     workoutData: WorkoutDataForEvaluation
-  ): Promise<EvaluationResult | null> => {
+  ): Promise<{ result: EvaluationResult; evaluationId: string | null } | null> => {
     if (!user) {
       toast({
         title: "Erro",
@@ -164,8 +164,8 @@ export function useWorkoutEvaluations() {
 
       const result = await response.json();
 
-      // Save evaluation to database
-      const { error: insertError } = await supabase
+      // Save evaluation to database and get the ID back
+      const { data: upsertedData, error: insertError } = await supabase
         .from('workout_evaluations')
         .upsert({
           user_id: user.id,
@@ -181,7 +181,9 @@ export function useWorkoutEvaluations() {
           follow_up_qa: []
         }, {
           onConflict: 'workout_id'
-        });
+        })
+        .select('id')
+        .single();
 
       if (insertError) {
         console.error('Error saving evaluation:', insertError);
@@ -189,13 +191,18 @@ export function useWorkoutEvaluations() {
       }
 
       await fetchEvaluations();
-
+      
+      // Return both the result and the evaluation ID
       return {
-        summaryTechnical: result.summaryTechnical,
-        efficiencyQuality: result.efficiencyQuality,
-        risksRedflags: result.risksRedflags,
-        generalSuggestions: result.generalSuggestions
+        result: {
+          summaryTechnical: result.summaryTechnical,
+          efficiencyQuality: result.efficiencyQuality,
+          risksRedflags: result.risksRedflags,
+          generalSuggestions: result.generalSuggestions
+        },
+        evaluationId: upsertedData?.id || null
       };
+
 
     } catch (error) {
       console.error('Error evaluating workout:', error);
