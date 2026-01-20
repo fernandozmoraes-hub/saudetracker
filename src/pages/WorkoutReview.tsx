@@ -105,7 +105,7 @@ export default function WorkoutReview() {
       session_type: selectedWorkout.sessionType || undefined
     };
 
-    const result = await evaluateWorkout(
+    const response = await evaluateWorkout(
       {
         workoutId: selectedWorkout.id,
         feelingAfter: feelingAfter || undefined,
@@ -116,20 +116,22 @@ export default function WorkoutReview() {
       workoutData
     );
 
-    if (result) {
-      setCurrentEvaluation(result);
-      // Fetch updated evaluation to get the ID
-      const updated = await getEvaluationByWorkoutId(selectedWorkout.id);
-      if (updated) {
-        setCurrentEvaluationId(updated.id);
-      }
+    if (response) {
+      setCurrentEvaluation(response.result);
+      setCurrentEvaluationId(response.evaluationId);
     }
 
     setIsEvaluating(false);
   };
 
   const handleAskFollowUp = async () => {
-    if (!followUpQuestion.trim() || !currentEvaluation || !currentEvaluationId) return;
+    if (!followUpQuestion.trim()) return;
+    
+    if (!currentEvaluation || !currentEvaluationId) {
+      // Show feedback when evaluation is missing
+      console.error('No evaluation found. Please evaluate the workout first.');
+      return;
+    }
 
     setIsAskingFollowUp(true);
     const question = followUpQuestion;
