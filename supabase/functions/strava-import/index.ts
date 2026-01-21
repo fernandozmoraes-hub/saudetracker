@@ -60,7 +60,8 @@ function determineZone(hr: number, zones: HrZone[]): number {
 function calculateTimePerZone(
   heartrateStream: number[],
   timeStream: number[],
-  zones: HrZone[]
+  zones: HrZone[],
+  totalDurationMin: number
 ): { z1: number; z2: number; z3: number; z4: number; z5: number } {
   const result = { z1: 0, z2: 0, z3: 0, z4: 0, z5: 0 };
 
@@ -71,14 +72,38 @@ function calculateTimePerZone(
     result[`z${zone}` as keyof typeof result] += duration;
   }
 
-  // Round to 1 decimal
-  return {
-    z1: Math.round(result.z1 * 10) / 10,
-    z2: Math.round(result.z2 * 10) / 10,
-    z3: Math.round(result.z3 * 10) / 10,
-    z4: Math.round(result.z4 * 10) / 10,
-    z5: Math.round(result.z5 * 10) / 10,
+  // Round each zone to nearest 0.5 (inteiro ou de 0,5 em 0,5)
+  const roundTo05 = (n: number) => Math.round(n * 2) / 2;
+  
+  const rounded = {
+    z1: roundTo05(result.z1),
+    z2: roundTo05(result.z2),
+    z3: roundTo05(result.z3),
+    z4: roundTo05(result.z4),
+    z5: roundTo05(result.z5),
   };
+
+  // Calculate the difference between rounded sum and actual total
+  const roundedSum = rounded.z1 + rounded.z2 + rounded.z3 + rounded.z4 + rounded.z5;
+  const targetTotal = roundTo05(totalDurationMin);
+  const diff = targetTotal - roundedSum;
+
+  // If there's a difference, adjust the largest non-zero zone
+  if (diff !== 0) {
+    // Find the zone with most time to adjust (minimizes relative error)
+    const zoneKeys: ('z1' | 'z2' | 'z3' | 'z4' | 'z5')[] = ['z1', 'z2', 'z3', 'z4', 'z5'];
+    const largestZone = zoneKeys.reduce((max, zone) => 
+      rounded[zone] > rounded[max] ? zone : max
+    , 'z1');
+    
+    // Adjust the largest zone to make sum equal target
+    rounded[largestZone] = roundTo05(rounded[largestZone] + diff);
+    
+    // Ensure no negative values
+    if (rounded[largestZone] < 0) rounded[largestZone] = 0;
+  }
+
+  return rounded;
 }
 
 function calculateHrTssByZones(timeZ1: number, timeZ2: number, timeZ3: number, timeZ4: number, timeZ5: number): number {
@@ -301,7 +326,8 @@ serve(async (req) => {
             const timePerZone = calculateTimePerZone(
               streamData.heartrate.data,
               streamData.time.data,
-              zones
+              zones,
+              result.durationMin
             );
 
             result.zones = timePerZone;
