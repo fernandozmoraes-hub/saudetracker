@@ -1,6 +1,6 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -11,35 +11,45 @@ const SYSTEM_PROMPT = `Você é o WorkoutEvaluatorAgent, responsável exclusivam
 Não interfira na análise fisiológica diária, que é feita por outro agente.
 Seu único papel é avaliar treinos concluídos com base nos dados fornecidos pelo usuário.
 
+Você tem acesso ao histórico de treinos do atleta e deve:
+- Comparar o treino atual com a média histórica do mesmo tipo
+- Identificar se métricas estão acima ou abaixo do padrão pessoal
+- Correlacionar com o estado fisiológico do dia (HRV, sono) quando disponível
+- Notar tendências de progressão ou regressão
+
 Diretrizes operacionais:
 
 Avalie apenas treinos já executados.
 
 Não crie planos de treino, não prescreva workouts futuros e não recomende cargas ou volumes.
 
-A análise deve ser baseada somente nas métricas informadas:
+A análise deve ser baseada nas métricas informadas e no contexto histórico:
 - tipo de treino (força, endurance)
-- duração
-- intensidade
+- duração (comparar com média histórica)
+- intensidade (comparar com padrão pessoal)
 - frequência cardíaca (média, máxima e zonas, se existirem)
-- percepção subjetiva de esforço (RPE)
+- percepção subjetiva de esforço (RPE) (comparar com média)
 - observações do treino (fadiga, dores, falhas, etc.)
+- estado fisiológico do dia (HRV, sono, humor)
 
 A saída deve ser estruturada em quatro blocos obrigatórios:
 
 (A) Resumo Técnico do Treino
 - descreva o que foi feito
 - destaque métricas relevantes
+- compare com histórico quando disponível
 - não invente dados ausentes
 
 (B) Eficiência e Qualidade
 - avalie execução, consistência, intensidade
 - destaque pontos fortes
+- compare com padrão histórico do atleta
 - indique sinais de possível excesso
 - nunca prescreva ajustes futuros
 
 (C) Riscos e Red Flags
 - identifique sinais de fadiga excessiva
+- correlacione com estado fisiológico (HRV baixo, sono ruim)
 - identifique combinações não usuais de intensidade/duração
 - mencione possíveis impactos fisiológicos, mas sem diagnóstico
 
@@ -55,6 +65,7 @@ Exemplos aceitáveis:
 O agente pode responder perguntas adicionais do usuário sobre o treino analisado, desde que sempre dentro dos limites acima:
 - explicar métricas
 - interpretar indicadores
+- comparar com histórico
 - ajudar o usuário a entender seu próprio registro de dados
 - sem orientar programação de treino
 
@@ -96,7 +107,117 @@ interface EvaluationRequest {
   };
 }
 
-function buildWorkoutPrompt(workout: WorkoutData): string {
+interface HistoricalWorkout {
+  date: string;
+  duration_min: number;
+  rpe: number;
+  tss_final: number | null;
+  avg_hr: number | null;
+  distance_km: number | null;
+  time_z1_min: number | null;
+  time_z2_min: number | null;
+  time_z3_min: number | null;
+  time_z4_min: number | null;
+  time_z5_min: number | null;
+}
+
+interface DailyCheckData {
+  hrv: number;
+  resting_hr: number;
+  sleep_hours: number;
+  sleep_quality: number;
+  mood: number | null;
+  body_battery: number | null;
+}
+
+interface UserSettingsData {
+  lthr: number | null;
+  resting_hr: number | null;
+  max_hr: number | null;
+}
+
+interface HistoricalContext {
+  recentWorkouts: HistoricalWorkout[] | null;
+  dailyCheck: DailyCheckData | null;
+  settings: UserSettingsData | null;
+  stats: WorkoutStats | null;
+}
+
+interface WorkoutStats {
+  avgDuration: number;
+  avgRpe: number;
+  avgTss: number | null;
+  avgHr: number | null;
+  maxDuration: number;
+  totalWorkouts: number;
+  avgDistanceKm: number | null;
+}
+
+function average(arr: number[]): number {
+  if (arr.length === 0) return 0;
+  return arr.reduce((a, b) => a + b, 0) / arr.length;
+}
+
+async function fetchHistoricalContext(
+  supabase: SupabaseClient,
+  userId: string,
+  workoutType: string,
+  workoutDate: string
+): Promise<HistoricalContext> {
+  // Fetch last 15 workouts of the same type (excluding current)
+  const { data: recentWorkouts } = await supabase
+    .from('workouts')
+    .select('date, duration_min, rpe, tss_final, avg_hr, distance_km, time_z1_min, time_z2_min, time_z3_min, time_z4_min, time_z5_min')
+    .eq('user_id', userId)
+    .eq('type', workoutType)
+    .neq('date', workoutDate)
+    .order('date', { ascending: false })
+    .limit(15);
+
+  // Fetch daily check for the workout day
+  const { data: dailyCheck } = await supabase
+    .from('daily_checks')
+    .select('hrv, resting_hr, sleep_hours, sleep_quality, mood, body_battery')
+    .eq('user_id', userId)
+    .eq('date', workoutDate)
+    .maybeSingle();
+
+  // Fetch user settings
+  const { data: settings } = await supabase
+    .from('user_settings')
+    .select('lthr, resting_hr, max_hr')
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  // Calculate statistics
+  let stats: WorkoutStats | null = null;
+  if (recentWorkouts && recentWorkouts.length > 0) {
+    const durations = recentWorkouts.map(w => Number(w.duration_min));
+    const rpes = recentWorkouts.map(w => w.rpe);
+    const tssValues = recentWorkouts.map(w => w.tss_final).filter((t): t is number => t !== null);
+    const hrValues = recentWorkouts.map(w => w.avg_hr).filter((h): h is number => h !== null);
+    const distances = recentWorkouts.map(w => w.distance_km).filter((d): d is number => d !== null);
+
+    stats = {
+      avgDuration: average(durations),
+      avgRpe: average(rpes),
+      avgTss: tssValues.length > 0 ? average(tssValues) : null,
+      avgHr: hrValues.length > 0 ? average(hrValues) : null,
+      maxDuration: Math.max(...durations),
+      totalWorkouts: recentWorkouts.length,
+      avgDistanceKm: distances.length > 0 ? average(distances) : null,
+    };
+  }
+
+  return {
+    recentWorkouts: recentWorkouts as HistoricalWorkout[] | null,
+    dailyCheck: dailyCheck as DailyCheckData | null,
+    settings: settings as UserSettingsData | null,
+    stats,
+  };
+}
+
+function buildWorkoutPrompt(workout: WorkoutData, context?: HistoricalContext): string {
   const lines: string[] = [];
   
   lines.push(`DADOS DO TREINO REALIZADO:`);
@@ -153,8 +274,73 @@ function buildWorkoutPrompt(workout: WorkoutData): string {
   if (workout.observations) {
     lines.push(`- Observações adicionais: ${workout.observations}`);
   }
+
+  // Add historical context if available
+  if (context) {
+    // Physiological state on workout day
+    if (context.dailyCheck) {
+      lines.push(`\nESTADO FISIOLÓGICO NO DIA DO TREINO:`);
+      lines.push(`- HRV: ${context.dailyCheck.hrv} ms`);
+      lines.push(`- FC de repouso: ${context.dailyCheck.resting_hr} bpm`);
+      lines.push(`- Sono: ${context.dailyCheck.sleep_hours.toFixed(1)}h (qualidade: ${context.dailyCheck.sleep_quality}/5)`);
+      if (context.dailyCheck.mood) {
+        lines.push(`- Humor: ${context.dailyCheck.mood}/5`);
+      }
+      if (context.dailyCheck.body_battery) {
+        lines.push(`- Body Battery: ${context.dailyCheck.body_battery}/100`);
+      }
+    }
+
+    // Historical comparison
+    if (context.stats && context.stats.totalWorkouts > 0) {
+      lines.push(`\nCONTEXTO HISTÓRICO (últimos ${context.stats.totalWorkouts} treinos de ${workout.type}):`);
+      
+      // Duration comparison
+      const durationDiff = ((workout.duration_min - context.stats.avgDuration) / context.stats.avgDuration * 100).toFixed(0);
+      const durationSign = Number(durationDiff) >= 0 ? '+' : '';
+      lines.push(`- Duração média: ${context.stats.avgDuration.toFixed(0)} min (este treino: ${workout.duration_min} min, ${durationSign}${durationDiff}%)`);
+      lines.push(`- Duração máxima registrada: ${context.stats.maxDuration.toFixed(0)} min`);
+      
+      // RPE comparison
+      const rpeDiff = (workout.rpe - context.stats.avgRpe).toFixed(1);
+      const rpeSign = Number(rpeDiff) >= 0 ? '+' : '';
+      lines.push(`- RPE médio: ${context.stats.avgRpe.toFixed(1)} (este treino: ${workout.rpe}, ${rpeSign}${rpeDiff})`);
+      
+      // TSS comparison if available
+      if (context.stats.avgTss && workout.tss_final) {
+        const tssDiff = ((workout.tss_final - context.stats.avgTss) / context.stats.avgTss * 100).toFixed(0);
+        const tssSign = Number(tssDiff) >= 0 ? '+' : '';
+        lines.push(`- TSS médio: ${context.stats.avgTss.toFixed(0)} (este treino: ${workout.tss_final.toFixed(0)}, ${tssSign}${tssDiff}%)`);
+      }
+      
+      // HR comparison if available
+      if (context.stats.avgHr && workout.avg_hr) {
+        const hrDiff = workout.avg_hr - context.stats.avgHr;
+        const hrSign = hrDiff >= 0 ? '+' : '';
+        lines.push(`- FC média histórica: ${context.stats.avgHr.toFixed(0)} bpm (este treino: ${workout.avg_hr} bpm, ${hrSign}${hrDiff.toFixed(0)})`);
+      }
+
+      // Distance comparison if available
+      if (context.stats.avgDistanceKm && workout.distance_km) {
+        const distDiff = ((workout.distance_km - context.stats.avgDistanceKm) / context.stats.avgDistanceKm * 100).toFixed(0);
+        const distSign = Number(distDiff) >= 0 ? '+' : '';
+        lines.push(`- Distância média: ${context.stats.avgDistanceKm.toFixed(2)} km (este treino: ${workout.distance_km.toFixed(2)} km, ${distSign}${distDiff}%)`);
+      }
+    }
+
+    // User settings for reference
+    if (context.settings) {
+      lines.push(`\nCONFIGURAÇÕES DO ATLETA:`);
+      if (context.settings.lthr) {
+        lines.push(`- LTHR configurado: ${context.settings.lthr} bpm`);
+      }
+      if (context.settings.max_hr) {
+        lines.push(`- FC máxima configurada: ${context.settings.max_hr} bpm`);
+      }
+    }
+  }
   
-  lines.push(`\nCom base nos dados acima, forneça sua análise estruturada nos 4 blocos obrigatórios (A, B, C, D).`);
+  lines.push(`\nCom base nos dados acima e no contexto histórico, forneça sua análise estruturada nos 4 blocos obrigatórios (A, B, C, D).`);
   
   return lines.join('\n');
 }
@@ -209,8 +395,18 @@ serve(async (req) => {
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
+
+      // Fetch historical context from database
+      console.log(`Fetching historical context for user ${user.id}, workout type: ${requestData.workout.type}`);
+      const historicalContext = await fetchHistoricalContext(
+        supabaseClient,
+        user.id,
+        requestData.workout.type,
+        requestData.workout.date
+      );
+      console.log(`Found ${historicalContext.stats?.totalWorkouts || 0} historical workouts, daily check: ${historicalContext.dailyCheck ? 'yes' : 'no'}`);
       
-      userPrompt = buildWorkoutPrompt(requestData.workout);
+      userPrompt = buildWorkoutPrompt(requestData.workout, historicalContext);
       
       // Use tool calling to get structured output
       tools = [
@@ -218,21 +414,21 @@ serve(async (req) => {
           type: "function",
           function: {
             name: "workout_evaluation",
-            description: "Retorna a avaliação estruturada do treino nos 4 blocos obrigatórios",
+            description: "Retorna a avaliação estruturada do treino nos 4 blocos obrigatórios, incluindo comparações com o histórico",
             parameters: {
               type: "object",
               properties: {
                 summaryTechnical: {
                   type: "string",
-                  description: "(A) Resumo Técnico do Treino - descrição objetiva do que foi feito, métricas relevantes"
+                  description: "(A) Resumo Técnico do Treino - descrição objetiva do que foi feito, métricas relevantes, comparação com histórico"
                 },
                 efficiencyQuality: {
                   type: "string",
-                  description: "(B) Eficiência e Qualidade - avaliação da execução, consistência, intensidade, pontos fortes"
+                  description: "(B) Eficiência e Qualidade - avaliação da execução, consistência, intensidade, pontos fortes, comparação com padrão pessoal"
                 },
                 risksRedflags: {
                   type: "string",
-                  description: "(C) Riscos e Red Flags - sinais de fadiga excessiva, combinações não usuais, possíveis impactos"
+                  description: "(C) Riscos e Red Flags - sinais de fadiga excessiva, correlação com estado fisiológico (HRV, sono), combinações não usuais"
                 },
                 generalSuggestions: {
                   type: "string",
