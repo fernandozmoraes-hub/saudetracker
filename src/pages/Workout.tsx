@@ -10,15 +10,23 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { useData } from '@/hooks/useData';
 import { useUserSettings } from '@/hooks/useUserSettings';
+import { useEquipment, calculateWearPercentage, getStatusColorClasses } from '@/hooks/useEquipment';
 import { calculateTssSubjective, calculateTssFinal, getHrZones, ZoneTimeInputs } from '@/lib/calculations';
 import { Workout as WorkoutType, WorkoutType as WorkoutTypeEnum, TssMethod } from '@/types/health';
 import { StravaActivityDetails } from '@/types/strava';
 import { useStravaConnection } from '@/hooks/useStravaConnection';
 import { StravaImportModal } from '@/components/strava/StravaImportModal';
 import { useToast } from '@/hooks/use-toast';
-import { Dumbbell, Bike, Timer, Activity, Check, MapPin, Heart, CalendarIcon, Settings, Info, Zap, Download, Pencil } from 'lucide-react';
+import { Dumbbell, Bike, Timer, Activity, Check, MapPin, Heart, CalendarIcon, Settings, Info, Zap, Download, Pencil, Footprints } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 
 const workoutTypes: { type: WorkoutTypeEnum; label: string; icon: React.ReactNode }[] = [
@@ -64,6 +72,7 @@ export default function Workout() {
   const { workouts, saveWorkout } = useData();
   const { settings } = useUserSettings();
   const { isConnected } = useStravaConnection();
+  const { getActiveEquipment, equipment } = useEquipment();
   const location = useLocation();
   const navigate = useNavigate();
   const [showStravaModal, setShowStravaModal] = useState(false);
@@ -80,6 +89,7 @@ export default function Workout() {
   const [distance, setDistance] = useState<number | undefined>();
   const [avgHr, setAvgHr] = useState<number | undefined>();
   const [muscleGroups, setMuscleGroups] = useState<string[]>([]);
+  const [selectedEquipmentId, setSelectedEquipmentId] = useState<string | undefined>();
   
   // HR Zone times
   const [useZoneTimes, setUseZoneTimes] = useState(false);
@@ -88,6 +98,9 @@ export default function Workout() {
   const [timeZ3, setTimeZ3] = useState<number>(0);
   const [timeZ4, setTimeZ4] = useState<number>(0);
   const [timeZ5, setTimeZ5] = useState<number>(0);
+
+  // Get active equipment for dropdown
+  const activeEquipment = getActiveEquipment();
 
   // Populate form when editing
   useEffect(() => {
@@ -102,6 +115,7 @@ export default function Workout() {
       setDistance(editWorkout.distanceKm || undefined);
       setAvgHr(editWorkout.avgHr || undefined);
       setMuscleGroups(editWorkout.muscleGroups || []);
+      setSelectedEquipmentId(editWorkout.equipmentId || undefined);
       
       // HR Zone times
       const hasZones = editWorkout.timeZ1Min || editWorkout.timeZ2Min || editWorkout.timeZ3Min || editWorkout.timeZ4Min || editWorkout.timeZ5Min;
@@ -217,6 +231,8 @@ export default function Workout() {
       timeZ4Min: zoneTimes?.timeZ4Min,
       timeZ5Min: zoneTimes?.timeZ5Min,
       tssMethod: tssCalc.tssMethod,
+      // Equipment
+      equipmentId: selectedType === 'Run' ? selectedEquipmentId : undefined,
     };
     
     const success = await saveWorkout(workout);
@@ -239,6 +255,7 @@ export default function Workout() {
         setDistance(undefined);
         setAvgHr(undefined);
         setMuscleGroups([]);
+        setSelectedEquipmentId(undefined);
         setUseZoneTimes(false);
         setTimeZ1(0);
         setTimeZ2(0);
@@ -261,7 +278,7 @@ export default function Workout() {
     return muscleGroupOptions.find(m => m.id === id)?.label || id;
   };
 
-  const handleStravaImport = (activity: StravaActivityDetails) => {
+  const handleStravaImport = (activity: StravaActivityDetails, equipmentId?: string) => {
     // Parse date in local timezone to avoid UTC offset issues
     const [year, month, day] = activity.date.split('-').map(Number);
     setSelectedDate(new Date(year, month - 1, day));
@@ -269,6 +286,7 @@ export default function Workout() {
     setDuration(activity.durationMin);
     setDistance(activity.distanceKm || undefined);
     setAvgHr(activity.avgHr || undefined);
+    setSelectedEquipmentId(equipmentId);
     
     if (activity.zones) {
       setUseZoneTimes(true);
@@ -437,6 +455,49 @@ export default function Workout() {
                     />
                   </div>
                 </div>
+
+                {/* Equipment Selection for Run */}
+                {selectedType === 'Run' && (
+                  <div className="space-y-2 animate-slide-up">
+                    <Label className="flex items-center gap-2">
+                      <Footprints className="w-4 h-4 text-primary" />
+                      Tênis Utilizado
+                    </Label>
+                    <Select
+                      value={selectedEquipmentId || 'none'}
+                      onValueChange={(value) => setSelectedEquipmentId(value === 'none' ? undefined : value)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione o tênis" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Nenhum selecionado</SelectItem>
+                        {activeEquipment.map((eq) => {
+                          const wearPct = calculateWearPercentage(eq.totalKm, eq.maxKm);
+                          const colors = getStatusColorClasses(eq.status);
+                          return (
+                            <SelectItem key={eq.id} value={eq.id}>
+                              <div className="flex items-center gap-2">
+                                <span>{eq.name}</span>
+                                <span className={`text-xs ${colors.text}`}>
+                                  ({wearPct.toFixed(0)}%)
+                                </span>
+                              </div>
+                            </SelectItem>
+                          );
+                        })}
+                      </SelectContent>
+                    </Select>
+                    {activeEquipment.length === 0 && (
+                      <p className="text-xs text-muted-foreground">
+                        Nenhum tênis ativo.{' '}
+                        <Link to="/equipment" className="text-primary hover:underline">
+                          Adicionar tênis
+                        </Link>
+                      </p>
+                    )}
+                  </div>
+                )}
 
                 {/* HR Zone Times Toggle */}
                 <div className="flex items-center justify-between p-4 rounded-xl bg-secondary border border-border animate-slide-up">

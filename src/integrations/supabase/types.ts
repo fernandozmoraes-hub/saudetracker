@@ -59,6 +59,48 @@ export type Database = {
         }
         Relationships: []
       }
+      equipment: {
+        Row: {
+          active_for_selection: boolean
+          brand: string | null
+          created_at: string
+          id: string
+          max_km: number
+          name: string
+          start_date: string
+          status: string
+          total_km: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          active_for_selection?: boolean
+          brand?: string | null
+          created_at?: string
+          id?: string
+          max_km?: number
+          name: string
+          start_date?: string
+          status?: string
+          total_km?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          active_for_selection?: boolean
+          brand?: string | null
+          created_at?: string
+          id?: string
+          max_km?: number
+          name?: string
+          start_date?: string
+          status?: string
+          total_km?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       strava_connections: {
         Row: {
           access_token: string
@@ -206,6 +248,7 @@ export type Database = {
           date: string
           distance_km: number | null
           duration_min: number
+          equipment_id: string | null
           id: string
           lthr_used: number | null
           muscle_groups: string[] | null
@@ -231,6 +274,7 @@ export type Database = {
           date: string
           distance_km?: number | null
           duration_min?: number
+          equipment_id?: string | null
           id?: string
           lthr_used?: number | null
           muscle_groups?: string[] | null
@@ -256,6 +300,7 @@ export type Database = {
           date?: string
           distance_km?: number | null
           duration_min?: number
+          equipment_id?: string | null
           id?: string
           lthr_used?: number | null
           muscle_groups?: string[] | null
@@ -275,7 +320,15 @@ export type Database = {
           user_id?: string
           validated?: boolean
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "workouts_equipment_id_fkey"
+            columns: ["equipment_id"]
+            isOneToOne: false
+            referencedRelation: "equipment"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {

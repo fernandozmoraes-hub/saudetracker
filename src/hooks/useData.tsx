@@ -76,6 +76,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         avgHr: row.avg_hr ?? undefined,
         lthrUsed: (row as any).lthr_used ?? undefined,
         muscleGroups: (row as any).muscle_groups ?? undefined,
+        equipmentId: (row as any).equipment_id ?? undefined,
       }));
       setWorkouts(workoutsArr);
     } catch (error) {
@@ -142,6 +143,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
           avg_hr: workout.avgHr ?? null,
           lthr_used: workout.lthrUsed ?? null,
           muscle_groups: workout.muscleGroups ?? null,
+          equipment_id: workout.equipmentId ?? null,
         });
 
       if (error) {
@@ -166,6 +168,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
           avg_hr: workout.avgHr ?? null,
           lthr_used: workout.lthrUsed ?? null,
           muscle_groups: workout.muscleGroups ?? null,
+          equipment_id: workout.equipmentId ?? null,
         })
         .eq('id', workout.id)
         .eq('user_id', user.id);

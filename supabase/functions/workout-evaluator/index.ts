@@ -17,6 +17,12 @@ Você tem acesso ao histórico de treinos do atleta e deve:
 - Correlacionar com o estado fisiológico do dia (HRV, sono) quando disponível
 - Notar tendências de progressão ou regressão
 
+Ao avaliar treinos de corrida, considere o estado do equipamento (tênis) quando informado:
+- Se o desgaste estiver acima de 85%, mencione que a absorção de impacto pode estar comprometida
+- Se o desgaste estiver acima de 100%, alerte sobre o risco aumentado de lesões
+- Nunca recomende compra de equipamentos
+- Apenas comente sobre o impacto potencial no desempenho e recuperação
+
 Diretrizes operacionais:
 
 Avalie apenas treinos já executados.
@@ -31,6 +37,7 @@ A análise deve ser baseada nas métricas informadas e no contexto histórico:
 - percepção subjetiva de esforço (RPE) (comparar com média)
 - observações do treino (fadiga, dores, falhas, etc.)
 - estado fisiológico do dia (HRV, sono, humor)
+- estado do equipamento (tênis) quando for corrida
 
 A saída deve ser estruturada em quatro blocos obrigatórios:
 
@@ -51,6 +58,7 @@ A saída deve ser estruturada em quatro blocos obrigatórios:
 - identifique sinais de fadiga excessiva
 - correlacione com estado fisiológico (HRV baixo, sono ruim)
 - identifique combinações não usuais de intensidade/duração
+- comente sobre estado do equipamento se relevante
 - mencione possíveis impactos fisiológicos, mas sem diagnóstico
 
 (D) Sugestões Gerais Não-Prescritivas
@@ -93,6 +101,7 @@ interface WorkoutData {
   feeling_after?: string;
   pain_discomfort?: string;
   observations?: string;
+  equipment_id?: string;
 }
 
 interface EvaluationRequest {
@@ -136,11 +145,22 @@ interface UserSettingsData {
   max_hr: number | null;
 }
 
+interface EquipmentContext {
+  name: string;
+  brand: string | null;
+  totalKm: number;
+  maxKm: number;
+  wearPercentage: number;
+  status: string;
+  daysInUse: number;
+}
+
 interface HistoricalContext {
   recentWorkouts: HistoricalWorkout[] | null;
   dailyCheck: DailyCheckData | null;
   settings: UserSettingsData | null;
   stats: WorkoutStats | null;
+  equipment: EquipmentContext | null;
 }
 
 interface WorkoutStats {
@@ -158,11 +178,45 @@ function average(arr: number[]): number {
   return arr.reduce((a, b) => a + b, 0) / arr.length;
 }
 
+function calculateDaysInUse(startDate: string): number {
+  const start = new Date(startDate);
+  const now = new Date();
+  const diffTime = Math.abs(now.getTime() - start.getTime());
+  return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+}
+
+async function fetchEquipmentContext(
+  supabase: SupabaseClient,
+  userId: string,
+  equipmentId: string
+): Promise<EquipmentContext | null> {
+  const { data } = await supabase
+    .from('equipment')
+    .select('name, brand, total_km, max_km, status, start_date')
+    .eq('id', equipmentId)
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  if (!data) return null;
+
+  const wearPercentage = Number(data.max_km) > 0 ? (Number(data.total_km) / Number(data.max_km)) * 100 : 0;
+  return {
+    name: data.name,
+    brand: data.brand,
+    totalKm: Number(data.total_km),
+    maxKm: Number(data.max_km),
+    wearPercentage,
+    status: data.status,
+    daysInUse: calculateDaysInUse(data.start_date),
+  };
+}
+
 async function fetchHistoricalContext(
   supabase: SupabaseClient,
   userId: string,
   workoutType: string,
-  workoutDate: string
+  workoutDate: string,
+  equipmentId?: string
 ): Promise<HistoricalContext> {
   // Fetch last 15 workouts of the same type (excluding current)
   const { data: recentWorkouts } = await supabase
@@ -209,11 +263,18 @@ async function fetchHistoricalContext(
     };
   }
 
+  // Fetch equipment context if equipmentId is provided
+  let equipmentContext: EquipmentContext | null = null;
+  if (equipmentId) {
+    equipmentContext = await fetchEquipmentContext(supabase, userId, equipmentId);
+  }
+
   return {
     recentWorkouts: recentWorkouts as HistoricalWorkout[] | null,
     dailyCheck: dailyCheck as DailyCheckData | null,
     settings: settings as UserSettingsData | null,
     stats,
+    equipment: equipmentContext,
   };
 }
 
@@ -338,6 +399,21 @@ function buildWorkoutPrompt(workout: WorkoutData, context?: HistoricalContext): 
         lines.push(`- FC máxima configurada: ${context.settings.max_hr} bpm`);
       }
     }
+
+    // Equipment context
+    if (context.equipment) {
+      lines.push(`\nEQUIPAMENTO UTILIZADO:`);
+      lines.push(`- Tênis: ${context.equipment.name}${context.equipment.brand ? ` (${context.equipment.brand})` : ''}`);
+      lines.push(`- Km acumulados: ${context.equipment.totalKm.toFixed(0)} / ${context.equipment.maxKm} km (${context.equipment.wearPercentage.toFixed(0)}% de uso)`);
+      lines.push(`- Status: ${context.equipment.status}`);
+      lines.push(`- Dias de uso: ${context.equipment.daysInUse}`);
+      
+      if (context.equipment.wearPercentage >= 100) {
+        lines.push(`- ⚠️ ALERTA: Tênis acima do limite recomendado de quilometragem!`);
+      } else if (context.equipment.wearPercentage >= 85) {
+        lines.push(`- ⚠️ ATENÇÃO: Tênis com mais de 85% da vida útil`);
+      }
+    }
   }
   
   lines.push(`\nCom base nos dados acima e no contexto histórico, forneça sua análise estruturada nos 4 blocos obrigatórios (A, B, C, D).`);
@@ -397,14 +473,15 @@ serve(async (req) => {
       }
 
       // Fetch historical context from database
-      console.log(`Fetching historical context for user ${user.id}, workout type: ${requestData.workout.type}`);
+      console.log(`Fetching historical context for user ${user.id}, workout type: ${requestData.workout.type}, equipment: ${requestData.workout.equipment_id || 'none'}`);
       const historicalContext = await fetchHistoricalContext(
         supabaseClient,
         user.id,
         requestData.workout.type,
-        requestData.workout.date
+        requestData.workout.date,
+        requestData.workout.equipment_id
       );
-      console.log(`Found ${historicalContext.stats?.totalWorkouts || 0} historical workouts, daily check: ${historicalContext.dailyCheck ? 'yes' : 'no'}`);
+      console.log(`Found ${historicalContext.stats?.totalWorkouts || 0} historical workouts, daily check: ${historicalContext.dailyCheck ? 'yes' : 'no'}, equipment: ${historicalContext.equipment ? historicalContext.equipment.name : 'none'}`);
       
       userPrompt = buildWorkoutPrompt(requestData.workout, historicalContext);
       

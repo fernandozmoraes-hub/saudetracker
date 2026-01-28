@@ -7,9 +7,10 @@ import { Label } from '@/components/ui/label';
 import { useUserSettings } from '@/hooks/useUserSettings';
 import { useStravaConnection } from '@/hooks/useStravaConnection';
 import { useToast } from '@/hooks/use-toast';
-import { Heart, Save, Info, Loader2, Activity, Dumbbell, Zap, Link2, Unlink, CheckCircle2 } from 'lucide-react';
+import { Heart, Save, Info, Loader2, Activity, Dumbbell, Zap, Link2, Unlink, CheckCircle2, Footprints, ChevronRight } from 'lucide-react';
 import { DEFAULT_LTHR, DEFAULT_ZONE_THRESHOLDS, getHrZones, ZONE_WEIGHTS } from '@/lib/calculations';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Link } from 'react-router-dom';
 
 export default function Settings() {
   const { toast } = useToast();
@@ -415,6 +416,26 @@ export default function Settings() {
           </p>
         </div>
       </div>
+
+      {/* Equipment Section */}
+      <Link to="/equipment">
+        <div className="gradient-card rounded-xl p-5 border border-border/50 hover:border-primary/50 transition-all animate-slide-up cursor-pointer">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-green-500/10">
+                <Footprints className="w-5 h-5 text-green-500" />
+              </div>
+              <div>
+                <h3 className="font-display font-semibold">Equipamentos</h3>
+                <p className="text-sm text-muted-foreground">
+                  Gerencie seus tênis de corrida
+                </p>
+              </div>
+            </div>
+            <ChevronRight className="w-5 h-5 text-muted-foreground" />
+          </div>
+        </div>
+      </Link>
 
       {/* Strava Integration */}
       <div className="gradient-card rounded-xl p-6 border border-border/50 space-y-4 animate-slide-up">
