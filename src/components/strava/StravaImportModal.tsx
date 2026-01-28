@@ -9,26 +9,40 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Loader2, Activity, Bike, Timer, Heart, MapPin, Zap, Check, ChevronRight } from 'lucide-react';
+import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Loader2, Activity, Bike, Timer, Heart, MapPin, Zap, Check, ChevronRight, Footprints } from 'lucide-react';
 import { useStravaConnection } from '@/hooks/useStravaConnection';
+import { useEquipment, calculateWearPercentage, getStatusColorClasses } from '@/hooks/useEquipment';
 import { StravaActivity, StravaActivityDetails } from '@/types/strava';
 import { ZoneDistributionChart } from './ZoneDistributionChart';
+import { Link } from 'react-router-dom';
 
 interface StravaImportModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onImport: (activity: StravaActivityDetails) => void;
+  onImport: (activity: StravaActivityDetails, equipmentId?: string) => void;
 }
 
 type Step = 'list' | 'details';
 
 export function StravaImportModal({ open, onOpenChange, onImport }: StravaImportModalProps) {
   const { listActivities, getActivityDetails, isConnected } = useStravaConnection();
+  const { getActiveEquipment } = useEquipment();
   const [step, setStep] = useState<Step>('list');
   const [activities, setActivities] = useState<StravaActivity[]>([]);
   const [selectedActivity, setSelectedActivity] = useState<StravaActivityDetails | null>(null);
+  const [selectedEquipmentId, setSelectedEquipmentId] = useState<string | undefined>();
   const [isLoadingList, setIsLoadingList] = useState(false);
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
+
+  const activeEquipment = getActiveEquipment();
 
   useEffect(() => {
     if (open && isConnected) {
@@ -40,6 +54,7 @@ export function StravaImportModal({ open, onOpenChange, onImport }: StravaImport
     if (!open) {
       setStep('list');
       setSelectedActivity(null);
+      setSelectedEquipmentId(undefined);
     }
   }, [open]);
 
@@ -68,7 +83,7 @@ export function StravaImportModal({ open, onOpenChange, onImport }: StravaImport
 
   const handleConfirmImport = () => {
     if (selectedActivity) {
-      onImport(selectedActivity);
+      onImport(selectedActivity, selectedEquipmentId);
       onOpenChange(false);
     }
   };
@@ -226,6 +241,49 @@ export function StravaImportModal({ open, onOpenChange, onImport }: StravaImport
                 <p className="text-muted-foreground">
                   Será usado HR-TSS (FC média) com base na FC média de {selectedActivity.avgHr} bpm
                 </p>
+              </div>
+            )}
+
+            {/* Equipment Selection for Run */}
+            {selectedActivity.type === 'Run' && (
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <Footprints className="w-4 h-4 text-primary" />
+                  Tênis Utilizado
+                </Label>
+                <Select
+                  value={selectedEquipmentId || 'none'}
+                  onValueChange={(value) => setSelectedEquipmentId(value === 'none' ? undefined : value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o tênis" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Nenhum selecionado</SelectItem>
+                    {activeEquipment.map((eq) => {
+                      const wearPct = calculateWearPercentage(eq.totalKm, eq.maxKm);
+                      const colors = getStatusColorClasses(eq.status);
+                      return (
+                        <SelectItem key={eq.id} value={eq.id}>
+                          <div className="flex items-center gap-2">
+                            <span>{eq.name}</span>
+                            <span className={`text-xs ${colors.text}`}>
+                              ({wearPct.toFixed(0)}%)
+                            </span>
+                          </div>
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
+                {activeEquipment.length === 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    Nenhum tênis ativo.{' '}
+                    <Link to="/equipment" className="text-primary hover:underline">
+                      Adicionar tênis
+                    </Link>
+                  </p>
+                )}
               </div>
             )}
 

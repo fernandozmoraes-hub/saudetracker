@@ -38,6 +38,7 @@ export interface Workout {
   timeZ4Min?: number;
   timeZ5Min?: number;
   tssMethod?: TssMethod; // 'HR_avg' (legado), 'HR_zones' (novo), 'RPE' (força)
+  equipmentId?: string; // FK to equipment table
 }
 
 // Configurações do usuário
@@ -96,4 +97,21 @@ export interface TodayMetrics {
   tsb: number;
   recommendation: 'maintain' | 'reduce' | 'rest';
   alert?: string;
+}
+
+// Equipment (Running Shoes) types
+export type EquipmentStatus = 'active' | 'attention' | 'retired';
+
+export interface Equipment {
+  id: string;
+  userId: string;
+  name: string;
+  brand?: string;
+  startDate: string;
+  totalKm: number;
+  maxKm: number;
+  status: EquipmentStatus;
+  activeForSelection: boolean;
+  createdAt?: string;
+  updatedAt?: string;
 }
