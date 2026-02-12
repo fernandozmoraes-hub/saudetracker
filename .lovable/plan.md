@@ -1,285 +1,293 @@
 
 
-## Plano: Implementar Pagina de Equipamentos (Tenis) com Integracao ao Workout Evaluator
+## Plano: Pagina de Composicao Corporal com Agente de Integridade Muscular
 
 ### Visao Geral
 
-Criar um sistema completo de gerenciamento de tenis de corrida, com:
-- Nova tabela `equipment` no banco de dados
-- Adicao de campo `equipment_id` na tabela `workouts`
-- Nova pagina de Equipamentos com UI/UX consistente
-- Acumulacao automatica de quilometragem
-- Alertas automaticos de desgaste
-- Integracao com o Workout Evaluator Agent
-
-### Arquitetura Proposta
-
-```text
-+-------------------+       +-------------------+
-|     workouts      |       |     equipment     |
-+-------------------+       +-------------------+
-| id                |       | id                |
-| ...               |       | user_id           |
-| equipment_id  ----+-----> | name              |
-| distance_km       |       | brand             |
-+-------------------+       | start_date        |
-                            | total_km          |
-                            | max_km            |
-                            | status            |
-                            | active            |
-                            +-------------------+
-```
+Criar um sistema completo de monitoramento de composicao corporal com:
+- Nova tabela `body_composition` no banco de dados
+- Nova pagina com registro, graficos longitudinais e analise de tendencias
+- Novo edge function `muscle-integrity-agent` (agente independente)
+- Cruzamento automatico com dados de treino existentes
+- Sem alterar agente fisiologico (`ai-coach`) nem logica de CTL/ATL/TSB
 
 ---
 
 ### Parte 1: Banco de Dados
 
-**1.1 Nova tabela `equipment`**
+**1.1 Nova tabela `body_composition`**
 
 | Coluna | Tipo | Nullable | Default | Descricao |
 |--------|------|----------|---------|-----------|
 | id | uuid | No | gen_random_uuid() | PK |
-| user_id | uuid | No | - | FK para auth.users |
-| name | text | No | - | Nome do tenis |
-| brand | text | Yes | null | Marca |
-| start_date | date | No | CURRENT_DATE | Data de inicio de uso |
-| total_km | numeric | No | 0 | Km acumulados (auto-calculado) |
-| max_km | numeric | No | 600 | Limite recomendado |
-| status | text | No | 'active' | 'active', 'attention', 'retired' |
-| active_for_selection | boolean | No | true | Aparece no dropdown |
+| user_id | uuid | No | - | Referencia ao usuario |
+| date | date | No | - | Data da medicao |
+| weight_kg | numeric | No | - | Peso corporal |
+| muscle_mass_kg | numeric | No | - | Massa muscular |
+| body_fat_pct | numeric | No | - | Percentual de gordura |
+| data_source | text | No | 'manual' | 'manual' ou 'smart_scale' |
+| notes | text | Yes | null | Observacoes |
+| flagged_inconsistent | boolean | No | false | Marcacao manual de medicao inconsistente |
 | created_at | timestamptz | No | now() | - |
 | updated_at | timestamptz | No | now() | - |
 
-**1.2 Alterar tabela `workouts`**
-
-Adicionar coluna:
-- `equipment_id` (uuid, nullable, FK para equipment.id)
-
-**1.3 RLS Policies para `equipment`**
-
-Seguindo o padrao existente:
-- SELECT: `auth.uid() = user_id`
-- INSERT: `auth.uid() = user_id`
-- UPDATE: `auth.uid() = user_id`
-- DELETE: `auth.uid() = user_id`
-
-**1.4 Database Trigger**
-
-Criar trigger para atualizar `total_km` automaticamente quando um workout e salvo/atualizado/deletado com `equipment_id` e `distance_km`.
+- Constraint UNIQUE em (user_id, date) para evitar duplicatas
+- RLS policies seguindo o padrao existente (SELECT, INSERT, UPDATE, DELETE por user_id)
+- Trigger `update_updated_at_column` reutilizado
 
 ---
 
-### Parte 2: Frontend - Tipos e Hooks
+### Parte 2: Tipos e Hook
 
 **2.1 Novos tipos em `src/types/health.ts`**
 
 ```typescript
-export type EquipmentStatus = 'active' | 'attention' | 'retired';
+export type DataSource = 'manual' | 'smart_scale';
 
-export interface Equipment {
+export interface BodyCompositionEntry {
   id: string;
   userId: string;
-  name: string;
-  brand?: string;
-  startDate: string;
-  totalKm: number;
-  maxKm: number;
-  status: EquipmentStatus;
-  activeForSelection: boolean;
+  date: string;
+  weightKg: number;
+  muscleMassKg: number;
+  bodyFatPct: number;
+  dataSource: DataSource;
+  notes?: string;
+  flaggedInconsistent: boolean;
   createdAt?: string;
   updatedAt?: string;
 }
+
+export type MuscleIntegrityStatus = 'preserved' | 'declining' | 'at_risk';
 ```
 
-**2.2 Atualizar tipo `Workout`**
+**2.2 Novo hook `src/hooks/useBodyComposition.tsx`**
 
-Adicionar campo `equipmentId?: string`
+Funcoes:
+- `entries: BodyCompositionEntry[]` - todas as entradas ordenadas por data
+- `isLoading: boolean`
+- `saveEntry(entry): Promise<boolean>` - upsert por (user_id, date)
+- `deleteEntry(id): Promise<boolean>`
+- `toggleInconsistent(id): Promise<boolean>` - marca/desmarca medicao inconsistente
+- `getLatest(): BodyCompositionEntry | null` - medicao mais recente
+- `getFilteredEntries(days): BodyCompositionEntry[]` - entradas dos ultimos N dias, excluindo flagged
 
-**2.3 Novo hook `src/hooks/useEquipment.tsx`**
+**2.3 Funcoes de calculo em `src/lib/bodyCompositionCalcs.ts`**
 
 ```typescript
-// Funcoes:
-// - equipment: Equipment[]
-// - isLoading: boolean
-// - saveEquipment(equipment: Equipment): Promise<boolean>
-// - deleteEquipment(id: string): Promise<boolean>
-// - refreshEquipment(): Promise<void>
-// - getActiveEquipment(): Equipment[] (apenas active_for_selection = true)
+// Media movel 7 dias (excluindo flagged)
+function movingAverage7d(entries, field, targetDate): number | null
+
+// Tendencia 30 dias com regressao linear simples
+function calculateTrend30d(entries, field): {
+  absoluteChange: number;
+  percentChange: number;
+  slope: number; // inclinacao da regressao
+}
+
+// Status de integridade muscular
+function getMuscleIntegrityStatus(trend30d): MuscleIntegrityStatus
+// Regras:
+// - 'preserved': variacao entre -1% e +1%
+// - 'declining': queda entre 1% e 2%
+// - 'at_risk': queda >2% OU tendencia negativa continua por 60 dias
+
+// Indice de Integridade Muscular
+function calculateMuscleIntegrityIndex(
+  currentLeanMassRatio, trend30d, weeklyTrainingLoad
+): number
+
+// Correlacao com treino (para o agente)
+function getTrainingCorrelation(workouts, days): {
+  weeklyVolumeKm: number;
+  strengthFrequency: number; // treinos de forca nos ultimos 30d
+  avgIntensity: number; // RPE medio
+}
 ```
 
 ---
 
-### Parte 3: Frontend - Pagina de Equipamentos
+### Parte 3: Pagina de Composicao Corporal
 
 **3.1 Nova rota em `App.tsx`**
 
 ```typescript
-<Route path="/equipment" element={<ProtectedRoute><Equipment /></ProtectedRoute>} />
+<Route path="/body-composition" element={<ProtectedRoute><BodyComposition /></ProtectedRoute>} />
 ```
 
-**3.2 Pagina `src/pages/Equipment.tsx`**
+**3.2 Pagina `src/pages/BodyComposition.tsx`**
 
-**Layout Principal (Lista de Tenis):**
+**Secao 1 - Resumo Atual (Topo)**
 
-Cada tenis como card contendo:
-- Nome do tenis (destaque)
-- Km acumulados / Km recomendados (ex: 420 / 600 km)
-- Barra de progresso visual (% de desgaste)
-- Status visual com cores:
-  - Verde (active): ate 80%
-  - Amarelo (attention): 80-100%
-  - Vermelho (retired): >100%
-- Botao "Ver detalhes"
+Cards com:
+- Peso atual (kg) com media movel 7d
+- Massa muscular atual (kg) com media movel 7d
+- % Gordura atual com media movel 7d
+- Status do Indice de Integridade Muscular (indicador colorido)
+  - Verde: Integridade preservada
+  - Amarelo: Tendencia de perda
+  - Vermelho: Perda muscular relevante
 
-**Modal/Sheet de Detalhes:**
-- Dados gerais do tenis
-- Km acumulados com barra de progresso
-- Lista dos ultimos treinos associados
-- Status atual (somente leitura)
-- Botao para "Aposentar" manualmente
-- Botao para editar nome/marca/limite
+**Secao 2 - Grafico Longitudinal**
 
-**Modal de Adicionar Novo Tenis:**
-- Campo: Nome (obrigatorio)
-- Campo: Marca (opcional)
-- Campo: Data de inicio (default: hoje)
-- Campo: Km maximo recomendado (default: 600)
+Grafico com recharts (ja instalado):
+- 3 linhas: Peso, Massa Muscular, % Gordura
+- Eixo Y duplo (kg a esquerda, % a direita)
+- Filtro de periodo: 30d / 90d / 180d
+- Dados filtrados excluem medicoes marcadas como inconsistentes
+
+**Secao 3 - Avaliacao do Agente**
+
+Bloco textual com:
+- Indicador de status (cor)
+- Analise contextual gerada pelo MuscleIntegrityAgent
+- Disclaimer: "Esta analise e baseada em tendencias e nao substitui avaliacao medica."
+
+**Secao 4 - Registro de Nova Medicao**
+
+Modal/Sheet com campos:
+- Data (default: hoje)
+- Peso (kg) - obrigatorio
+- Massa muscular (kg) - obrigatorio
+- % Gordura - obrigatorio
+- Origem: manual / balanca smart
+- Observacoes (opcional)
+
+**Secao 5 - Historico**
+
+Lista das medicoes recentes com opcao de:
+- Marcar como inconsistente (toggle)
+- Excluir
 
 **3.3 Navegacao**
 
-Adicionar item na BottomNav (ou em Settings como subsecao):
+Adicionar link na pagina Settings (mesmo padrao do Equipamentos):
+- Icone: Scale ou Activity
+- Label: "Composicao Corporal"
+- Link para /body-composition
 
-Opcao 1 - Subsecao em Settings:
-- Link para /equipment dentro da pagina Settings
-
-Opcao 2 - Novo item na BottomNav:
-- Icone: Footprints ou Package
-- Label: "Tenis"
-
-Recomendacao: Subsecao em Settings para nao poluir a navegacao principal.
+Tambem adicionar na BottomNav como item contextual ou subsecao de Settings.
 
 ---
 
-### Parte 4: Integracao com Treinos
+### Parte 4: Edge Function - MuscleIntegrityAgent
 
-**4.1 Atualizar `src/pages/Workout.tsx`**
+**4.1 Novo arquivo `supabase/functions/muscle-integrity-agent/index.ts`**
 
-Para treinos do tipo "Run":
-- Adicionar dropdown de selecao de tenis
-- Mostrar apenas tenis com `active_for_selection = true`
-- Campo obrigatorio para corridas com distancia
+**Dados que o agente recebe (buscados do banco):**
 
-**4.2 Atualizar `src/components/strava/StravaImportModal.tsx`**
+| Fonte | Dados |
+|-------|-------|
+| `body_composition` | Ultimas 60+ medicoes (excluindo flagged) |
+| `workouts` | Ultimos 30-60 dias de treinos |
+| Calculado | Tendencia 30d, media movel, correlacoes |
 
-- Adicionar step de selecao de tenis antes de confirmar importacao
-- Mostrar lista de tenis ativos
+**Fluxo:**
 
-**4.3 Atualizar `src/hooks/useData.tsx`**
+1. Autenticar usuario
+2. Buscar medicoes de composicao corporal (ultimos 90 dias, excluindo flagged)
+3. Buscar treinos dos ultimos 60 dias
+4. Calcular tendencias e correlacoes no backend
+5. Construir prompt enriquecido
+6. Enviar para Lovable AI (google/gemini-2.5-flash)
+7. Retornar analise estruturada
 
-- Incluir `equipment_id` no save/update de workouts
-- Mapeamento correto do campo
-
----
-
-### Parte 5: Logica de Alertas Automaticos
-
-**5.1 Funcao de calculo de status**
-
-```typescript
-function calculateEquipmentStatus(totalKm: number, maxKm: number): EquipmentStatus {
-  const percentage = (totalKm / maxKm) * 100;
-  if (percentage >= 100) return 'retired';
-  if (percentage >= 80) return 'attention';
-  return 'active';
-}
-```
-
-**5.2 Trigger no banco de dados**
-
-Apos cada UPDATE em `equipment.total_km`:
-- Recalcular status
-- Se status = 'retired', setar `active_for_selection = false`
-
-**5.3 Alertas visuais**
-
-Na pagina de Equipamentos:
-- Cards com borda colorida conforme status
-- Badge de alerta para tenis em "attention"
-- Card destacado para tenis "retired"
-
-Na pagina Today/Index:
-- Banner de alerta se houver tenis proximo do limite
-
----
-
-### Parte 6: Integracao com Workout Evaluator Agent
-
-**6.1 Atualizar `supabase/functions/workout-evaluator/index.ts`**
-
-**Buscar dados do equipamento usado:**
-
-```typescript
-// Adicionar ao fetchHistoricalContext ou criar funcao separada
-async function fetchEquipmentContext(
-  supabase: SupabaseClient,
-  userId: string,
-  equipmentId: string
-): Promise<EquipmentContext | null> {
-  const { data } = await supabase
-    .from('equipment')
-    .select('name, brand, total_km, max_km, status, start_date')
-    .eq('id', equipmentId)
-    .eq('user_id', userId)
-    .maybeSingle();
-  
-  if (!data) return null;
-  
-  const wearPercentage = (data.total_km / data.max_km) * 100;
-  return {
-    name: data.name,
-    brand: data.brand,
-    totalKm: data.total_km,
-    maxKm: data.max_km,
-    wearPercentage,
-    status: data.status,
-    daysInUse: calculateDaysInUse(data.start_date)
-  };
-}
-```
-
-**6.2 Atualizar `buildWorkoutPrompt`**
-
-Adicionar secao de contexto do equipamento:
-
-```typescript
-if (context.equipment) {
-  lines.push(`\nEQUIPAMENTO UTILIZADO:`);
-  lines.push(`- Tenis: ${context.equipment.name}${context.equipment.brand ? ` (${context.equipment.brand})` : ''}`);
-  lines.push(`- Km acumulados: ${context.equipment.totalKm.toFixed(0)} / ${context.equipment.maxKm} km (${context.equipment.wearPercentage.toFixed(0)}%)`);
-  lines.push(`- Status: ${context.equipment.status}`);
-  lines.push(`- Dias de uso: ${context.equipment.daysInUse}`);
-}
-```
-
-**6.3 Atualizar SYSTEM_PROMPT**
-
-Adicionar instrucoes sobre analise de equipamento:
+**System Prompt do MuscleIntegrityAgent:**
 
 ```text
-Ao avaliar treinos de corrida, considere o estado do equipamento (tenis):
-- Se o desgaste estiver acima de 85%, mencione que a absorção de impacto pode estar comprometida
-- Se o desgaste estiver acima de 100%, alerte sobre o risco aumentado de lesões
-- Nunca recomende compra de equipamentos
-- Apenas comente sobre o impacto potencial no desempenho e recuperação
+Voce e o MuscleIntegrityAgent, responsavel por analisar tendencias de composicao corporal.
+
+Voce NAO e um agente fisiologico. NAO analise HRV, CTL, ATL ou TSB.
+Voce NAO diagnostica condicoes medicas.
+Voce NAO prescreve dieta ou treino.
+
+Seu papel:
+- Analisar tendencias de peso, massa muscular e % gordura
+- Correlacionar com carga e tipo de treino
+- Identificar padroes de risco funcional
+- Gerar comentarios tecnicos claros
+
+Cenarios de correlacao:
+- Volume alto + queda muscular = recuperacao insuficiente
+- Sem treino de forca + queda muscular = falta de estimulo anabolico
+- Volume estavel + perda muscular = possivel deficit energetico
+
+Classificacao:
+- Preservada: variacao muscular entre -1% e +1% em 30 dias
+- Tendencia de perda: queda entre 1% e 2% em 30 dias
+- Perda relevante: queda >2% ou tendencia negativa por 60+ dias
+
+Regras de linguagem:
+- NAO use "sarcopenia", "atrofia" ou outros termos diagnosticos
+- NAO recomende compra de suplementos
+- NAO prescreva dieta ou treino
+- Use sempre "tendencia sugere", "padrao indica", "dados apontam"
+
+Sempre finalize com:
+"Avaliacao baseada em tendencias de composicao corporal. Nao substitui avaliacao clinica."
 ```
 
-**6.4 Exemplos de comentarios esperados**
+**Prompt do usuario construido com dados reais:**
 
-- Desgaste alto (85%): "Este treino foi realizado com um tenis ja acima de 85% da vida util. Para treinos longos ou intensos, considere alternar com outro par para reduzir risco de lesao."
+```text
+COMPOSICAO CORPORAL - MEDICOES RECENTES:
+[ultimas 10-15 medicoes com data, peso, massa muscular, % gordura]
 
-- Desgaste critico (>100%): "O tenis utilizado ultrapassou o limite recomendado de quilometragem. Isso pode comprometer absorcao de impacto e economia de corrida."
+TENDENCIA 30 DIAS (MASSA MUSCULAR):
+- Variacao absoluta: X kg
+- Variacao percentual: X%
+- Inclinacao da regressao: X kg/dia
 
-- Desgaste baixo (<50%): "O tenis utilizado esta em boas condicoes, sem impacto negativo esperado no desempenho ou recuperacao."
+MEDIAS MOVEIS 7 DIAS (ATUAIS):
+- Peso: X kg
+- Massa muscular: X kg
+- % Gordura: X%
+
+MASSA MAGRA RELATIVA: X (massa_muscular / peso)
+
+CONTEXTO DE TREINO (30 DIAS):
+- Volume semanal medio: X km
+- Frequencia de treinos de forca: X sessoes
+- RPE medio: X
+- TSS semanal medio: X
+
+STATUS ATUAL: [preserved/declining/at_risk]
+
+Forneca sua analise estruturada.
+```
+
+**Estrutura da resposta esperada:**
+
+O agente retorna texto livre estruturado com:
+1. Status (Preservada / Tendencia de perda / Perda relevante)
+2. Analise contextual
+3. Correlacao com treino
+4. Disclaimer
+
+---
+
+### Parte 5: Controle de Ruido
+
+Implementado nas funcoes de calculo:
+
+- Media movel 7 dias para suavizar flutuacoes diarias
+- Medicoes marcadas como "inconsistente" sao excluidas de calculos e graficos
+- Variacoes isoladas <0.5% sao ignoradas na classificacao de tendencia
+- Tendencia usa regressao linear (nao ponto a ponto) para robustez
+
+---
+
+### Parte 6: Integracao com Outros Modulos
+
+**Leitura (somente):**
+- Tabela `workouts`: volume semanal, tipo, frequencia de forca, RPE
+- Calculado via funcoes existentes
+
+**NAO altera:**
+- Agente fisiologico (`ai-coach`)
+- Sistema de HRV
+- Logica de CTL / ATL / TSB
+- Agente de avaliacao de treino (`workout-evaluator`)
 
 ---
 
@@ -287,105 +295,53 @@ Ao avaliar treinos de corrida, considere o estado do equipamento (tenis):
 
 | Arquivo | Acao | Descricao |
 |---------|------|-----------|
-| `supabase/migrations/*.sql` | Criar | Tabela equipment, FK em workouts, trigger, RLS |
-| `src/types/health.ts` | Modificar | Adicionar tipos Equipment e EquipmentStatus |
-| `src/hooks/useEquipment.tsx` | Criar | Hook para CRUD de equipamentos |
-| `src/hooks/useData.tsx` | Modificar | Incluir equipment_id no workout |
-| `src/pages/Equipment.tsx` | Criar | Pagina principal de equipamentos |
-| `src/pages/Workout.tsx` | Modificar | Adicionar selecao de tenis |
-| `src/components/strava/StravaImportModal.tsx` | Modificar | Adicionar selecao de tenis |
-| `src/components/layout/BottomNav.tsx` | Modificar | (Opcional) Adicionar link |
-| `src/pages/Settings.tsx` | Modificar | Adicionar link para Equipamentos |
-| `src/App.tsx` | Modificar | Adicionar rota /equipment |
-| `supabase/functions/workout-evaluator/index.ts` | Modificar | Buscar e usar contexto do equipamento |
+| Migration SQL | Criar | Tabela body_composition + RLS + trigger |
+| `src/types/health.ts` | Modificar | Adicionar tipos BodyCompositionEntry, DataSource, MuscleIntegrityStatus |
+| `src/lib/bodyCompositionCalcs.ts` | Criar | Funcoes de calculo (media movel, tendencia, regressao, correlacao) |
+| `src/hooks/useBodyComposition.tsx` | Criar | Hook para CRUD e calculos derivados |
+| `src/pages/BodyComposition.tsx` | Criar | Pagina principal com resumo, graficos e agente |
+| `src/App.tsx` | Modificar | Adicionar rota /body-composition |
+| `src/pages/Settings.tsx` | Modificar | Adicionar link para Composicao Corporal |
+| `supabase/functions/muscle-integrity-agent/index.ts` | Criar | Novo edge function do agente |
+| `supabase/config.toml` | Nao modificar | Atualizado automaticamente |
 
 ---
 
 ### Detalhes Tecnicos
 
-**Calculo automatico de km:**
+**Regressao linear simples (slope):**
 
-O trigger no banco de dados sera responsavel por:
-1. Ao INSERT/UPDATE/DELETE em workouts com equipment_id
-2. Recalcular SUM(distance_km) para aquele equipment_id
-3. Atualizar total_km na tabela equipment
-4. Recalcular status baseado no percentual
-5. Se status = 'retired', setar active_for_selection = false
-
-**SQL do Trigger:**
-
-```sql
-CREATE OR REPLACE FUNCTION update_equipment_km()
-RETURNS TRIGGER AS $$
-DECLARE
-  v_total_km NUMERIC;
-  v_max_km NUMERIC;
-  v_new_status TEXT;
-BEGIN
-  -- Determinar o equipment_id afetado
-  IF TG_OP = 'DELETE' THEN
-    IF OLD.equipment_id IS NULL THEN RETURN OLD; END IF;
-    
-    SELECT COALESCE(SUM(distance_km), 0) INTO v_total_km
-    FROM workouts WHERE equipment_id = OLD.equipment_id;
-    
-    UPDATE equipment 
-    SET total_km = v_total_km,
-        status = CASE 
-          WHEN v_total_km >= max_km THEN 'retired'
-          WHEN v_total_km >= max_km * 0.8 THEN 'attention'
-          ELSE 'active'
-        END,
-        active_for_selection = (v_total_km < max_km),
-        updated_at = now()
-    WHERE id = OLD.equipment_id;
-    
-    RETURN OLD;
-  ELSE
-    IF NEW.equipment_id IS NULL THEN RETURN NEW; END IF;
-    
-    SELECT COALESCE(SUM(distance_km), 0) INTO v_total_km
-    FROM workouts WHERE equipment_id = NEW.equipment_id;
-    
-    SELECT max_km INTO v_max_km FROM equipment WHERE id = NEW.equipment_id;
-    
-    UPDATE equipment 
-    SET total_km = v_total_km,
-        status = CASE 
-          WHEN v_total_km >= v_max_km THEN 'retired'
-          WHEN v_total_km >= v_max_km * 0.8 THEN 'attention'
-          ELSE 'active'
-        END,
-        active_for_selection = (v_total_km < v_max_km),
-        updated_at = now()
-    WHERE id = NEW.equipment_id;
-    
-    RETURN NEW;
-  END IF;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE TRIGGER trigger_update_equipment_km
-AFTER INSERT OR UPDATE OR DELETE ON workouts
-FOR EACH ROW EXECUTE FUNCTION update_equipment_km();
+```typescript
+function linearRegression(points: {x: number, y: number}[]): { slope: number, intercept: number } {
+  const n = points.length;
+  if (n < 2) return { slope: 0, intercept: points[0]?.y ?? 0 };
+  
+  const sumX = points.reduce((s, p) => s + p.x, 0);
+  const sumY = points.reduce((s, p) => s + p.y, 0);
+  const sumXY = points.reduce((s, p) => s + p.x * p.y, 0);
+  const sumX2 = points.reduce((s, p) => s + p.x * p.x, 0);
+  
+  const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
+  const intercept = (sumY - slope * sumX) / n;
+  
+  return { slope, intercept };
+}
 ```
+
+**Grafico com Recharts:**
+
+Usa `LineChart` com `YAxis` duplo:
+- yAxisId="left" para kg (peso + massa muscular)
+- yAxisId="right" para % (gordura)
+- `ResponsiveContainer` para responsividade mobile
 
 ---
 
 ### Nao Sera Alterado
 
-Conforme especificado:
-- Agente fisiologico (ai-coach)
-- Logica de CTL / ATL / TSB
-- Calculo de HRV e metricas fisiologicas
-- Nenhuma mistura de equipamentos com analise fisiologica
-
----
-
-### Proximos Passos Apos Implementacao
-
-1. Adicionar suporte para outros tipos de equipamento (bike, sapatilha)
-2. Historico de trocas de equipamento
-3. Exportar relatorio de uso por equipamento
-4. Grafico de evolucao de km por tenis ao longo do tempo
+- Agente fisiologico (`ai-coach`) - intacto
+- Agente de avaliacao de treino (`workout-evaluator`) - intacto
+- Logica de CTL / ATL / TSB em `calculations.ts` - intacto
+- Sistema de HRV - intacto
+- Pagina Today - intacto
 
