@@ -20,6 +20,7 @@ import Settings from "./pages/Settings";
 import Install from "./pages/Install";
 import WorkoutReview from "./pages/WorkoutReview";
 import Equipment from "./pages/Equipment";
+import BodyComposition from "./pages/BodyComposition";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -46,6 +47,7 @@ const App = () => (
                     <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
                     <Route path="/workout-review" element={<ProtectedRoute><WorkoutReview /></ProtectedRoute>} />
                     <Route path="/equipment" element={<ProtectedRoute><Equipment /></ProtectedRoute>} />
+                    <Route path="/body-composition" element={<ProtectedRoute><BodyComposition /></ProtectedRoute>} />
                     <Route path="/install" element={<Install />} />
                     <Route path="*" element={<NotFound />} />
                   </Routes>

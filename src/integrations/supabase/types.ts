@@ -14,6 +14,48 @@ export type Database = {
   }
   public: {
     Tables: {
+      body_composition: {
+        Row: {
+          body_fat_pct: number
+          created_at: string
+          data_source: string
+          date: string
+          flagged_inconsistent: boolean
+          id: string
+          muscle_mass_kg: number
+          notes: string | null
+          updated_at: string
+          user_id: string
+          weight_kg: number
+        }
+        Insert: {
+          body_fat_pct: number
+          created_at?: string
+          data_source?: string
+          date: string
+          flagged_inconsistent?: boolean
+          id?: string
+          muscle_mass_kg: number
+          notes?: string | null
+          updated_at?: string
+          user_id: string
+          weight_kg: number
+        }
+        Update: {
+          body_fat_pct?: number
+          created_at?: string
+          data_source?: string
+          date?: string
+          flagged_inconsistent?: boolean
+          id?: string
+          muscle_mass_kg?: number
+          notes?: string | null
+          updated_at?: string
+          user_id?: string
+          weight_kg?: number
+        }
+        Relationships: []
+      }
       daily_checks: {
         Row: {
           body_battery: number | null

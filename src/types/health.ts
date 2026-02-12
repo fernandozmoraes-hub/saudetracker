@@ -99,6 +99,24 @@ export interface TodayMetrics {
   alert?: string;
 }
 
+// Body Composition types
+export type DataSource = 'manual' | 'smart_scale';
+export type MuscleIntegrityStatus = 'preserved' | 'declining' | 'at_risk';
+
+export interface BodyCompositionEntry {
+  id: string;
+  userId: string;
+  date: string;
+  weightKg: number;
+  muscleMassKg: number;
+  bodyFatPct: number;
+  dataSource: DataSource;
+  notes?: string;
+  flaggedInconsistent: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 // Equipment (Running Shoes) types
 export type EquipmentStatus = 'active' | 'attention' | 'retired';
 
