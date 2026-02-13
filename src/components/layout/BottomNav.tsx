@@ -1,12 +1,13 @@
 import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
-import { Heart, Dumbbell, Home, Calendar, Settings } from 'lucide-react';
+import { Heart, Dumbbell, Home, Calendar, Scale, Settings } from 'lucide-react';
 
 const navItems = [
   { path: '/checkin', label: 'Check-in', icon: Heart },
   { path: '/workout', label: 'Treino', icon: Dumbbell },
   { path: '/', label: 'Hoje', icon: Home },
   { path: '/calendar', label: 'Calendário', icon: Calendar },
+  { path: '/body-composition', label: 'Corporal', icon: Scale },
   { path: '/settings', label: 'Config', icon: Settings },
 ];
 
@@ -24,7 +25,7 @@ export function BottomNav() {
               key={path}
               to={path}
               className={cn(
-                'flex flex-col items-center justify-center gap-1 px-3 py-2 rounded-lg transition-all duration-200',
+                'flex flex-col items-center justify-center gap-1 px-1.5 py-2 rounded-lg transition-all duration-200',
                 isActive 
                   ? 'text-primary' 
                   : 'text-muted-foreground hover:text-foreground'
