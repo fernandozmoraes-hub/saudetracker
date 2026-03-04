@@ -2,7 +2,7 @@ import { format, subDays } from 'date-fns';
 import { DailyCheck, Workout, AlcoholIntakeEntry } from '@/types/health';
 import { getHRVMetrics, calculateATL, calculateCTL, getHRVBaseline7d } from './calculations';
 import { AnalysisData, TriggerResult, evaluateTriggers } from './triggers';
-import { getDailyTotal, getAlcoholImpact, getImpactLabel, getConsecutiveDrinkingDays } from './alcoholCalcs';
+import { getDailyTotal, getAlcoholImpact, getImpactLabel, getConsecutiveDrinkingDays, getAlcoholHRVCorrelation, getWeeklyPattern } from './alcoholCalcs';
 
 export function buildAnalysisData(dailyChecks: DailyCheck[], workouts: Workout[], alcoholEntries?: AlcoholIntakeEntry[]): { data: AnalysisData | null; triggerResult: TriggerResult } {
   const today = format(new Date(), 'yyyy-MM-dd');
@@ -109,11 +109,20 @@ export function buildAnalysisData(dailyChecks: DailyCheck[], workouts: Workout[]
     const impact = getAlcoholImpact(yesterdayGrams);
     const consecutiveDrinkingDays = getConsecutiveDrinkingDays(alcoholEntries);
 
-    if (yesterdayGrams > 0 || consecutiveDrinkingDays > 0) {
+    // New: correlation & pattern
+    const correlation = getAlcoholHRVCorrelation(alcoholEntries, dailyChecks.map(c => ({ date: c.date, hrv: c.hrv })));
+    const weeklyPattern = getWeeklyPattern(alcoholEntries);
+
+    if (yesterdayGrams > 0 || consecutiveDrinkingDays > 0 || correlation || weeklyPattern.pattern !== 'controlled') {
       analysisData.alcoholContext = {
         yesterdayGrams,
         impact: getImpactLabel(impact),
         consecutiveDrinkingDays,
+        correlationR: correlation?.r,
+        correlationClassification: correlation?.label,
+        weeklyAvgGrams: weeklyPattern.avgWeekly,
+        weeklyPattern: weeklyPattern.label,
+        weeklyTrend: weeklyPattern.trend,
       };
     }
   }

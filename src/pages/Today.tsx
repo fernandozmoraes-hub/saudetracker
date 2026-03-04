@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { MetricCard } from '@/components/ui/MetricCard';
 import { StatusBadge } from '@/components/ui/StatusBadge';
@@ -5,9 +6,11 @@ import { AICoach } from '@/components/AICoach';
 import { TrendCharts } from '@/components/TrendCharts';
 import { getTodayMetrics } from '@/lib/calculations';
 import { useData } from '@/hooks/useData';
+import { useAlcoholIntake } from '@/hooks/useAlcoholIntake';
+import { getAlcoholHRVCorrelation, getCorrelationColor, getCorrelationBgColor, getWeeklyPattern, getWeeklyPatternColor, getTrendArrow } from '@/lib/alcoholCalcs';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Heart, TrendingUp, TrendingDown, Activity, AlertTriangle, CheckCircle, PauseCircle, Loader2, Dumbbell } from 'lucide-react';
+import { Heart, TrendingUp, TrendingDown, Activity, AlertTriangle, CheckCircle, PauseCircle, Loader2, Dumbbell, Wine } from 'lucide-react';
 
 const recommendationConfig = {
   maintain: {
@@ -35,6 +38,13 @@ const recommendationConfig = {
 
 export default function Today() {
   const { dailyChecks, workouts, isLoading } = useData();
+  const { entries: alcoholEntries } = useAlcoholIntake();
+
+  const correlation = useMemo(
+    () => getAlcoholHRVCorrelation(alcoholEntries, dailyChecks.map(c => ({ date: c.date, hrv: c.hrv }))),
+    [alcoholEntries, dailyChecks]
+  );
+  const weeklyPattern = useMemo(() => getWeeklyPattern(alcoholEntries), [alcoholEntries]);
   
   if (isLoading) {
     return (
@@ -121,6 +131,40 @@ export default function Today() {
       {/* AI Coach Analysis */}
       <AICoach />
       
+      {/* Alcohol Impact Card - only if sufficient data */}
+      {correlation && (
+        <div className={`rounded-xl p-5 border border-border/50 animate-slide-up ${getCorrelationBgColor(correlation.classification)}`}>
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <Wine className="w-5 h-5 text-primary" />
+              <span className="font-display font-semibold">Impacto do Álcool</span>
+            </div>
+            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${getWeeklyPatternColor(weeklyPattern.pattern) === 'text-green-500' ? 'bg-green-500/10 text-green-500' : getWeeklyPatternColor(weeklyPattern.pattern) === 'text-yellow-500' ? 'bg-yellow-500/10 text-yellow-500' : 'bg-red-500/10 text-red-500'}`}>
+              {weeklyPattern.label}
+            </span>
+          </div>
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <p className="text-xs text-muted-foreground">Correlação (r)</p>
+              <p className={`text-lg font-bold ${getCorrelationColor(correlation.classification)}`}>
+                {correlation.r.toFixed(2)}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Média semanal</p>
+              <p className="text-lg font-bold">{weeklyPattern.avgWeekly}g</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Tendência</p>
+              <p className="text-lg font-bold">{getTrendArrow(weeklyPattern.trend)}</p>
+            </div>
+          </div>
+          <p className={`text-xs mt-2 ${getCorrelationColor(correlation.classification)}`}>
+            {correlation.label}
+          </p>
+        </div>
+      )}
+
       {/* Trend Charts */}
       <TrendCharts />
       

@@ -27,6 +27,11 @@ export interface AnalysisData {
     yesterdayGrams: number;
     impact: string;
     consecutiveDrinkingDays: number;
+    correlationR?: number;
+    correlationClassification?: string;
+    weeklyAvgGrams?: number;
+    weeklyPattern?: string;
+    weeklyTrend?: string;
   };
 }
 
