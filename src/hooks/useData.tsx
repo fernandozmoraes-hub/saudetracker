@@ -49,6 +49,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         mood: row.mood ?? undefined,
         bodyBattery: row.body_battery ?? undefined,
         notes: row.notes ?? undefined,
+        alcoholYesterday: (row as any).alcohol_yesterday ?? undefined,
       }));
       setDailyChecks(checks);
 
@@ -105,7 +106,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
         mood: check.mood ?? null,
         body_battery: check.bodyBattery ?? null,
         notes: check.notes ?? null,
-      }, {
+        alcohol_yesterday: check.alcoholYesterday ?? false,
+      } as any, {
         onConflict: 'user_id,date',
       });
 

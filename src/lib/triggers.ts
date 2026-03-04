@@ -23,6 +23,11 @@ export interface AnalysisData {
     atlTrend5d: 'increasing' | 'stable' | 'decreasing';
   };
   recentWorkouts: Workout[];
+  alcoholContext?: {
+    yesterdayGrams: number;
+    impact: string;
+    consecutiveDrinkingDays: number;
+  };
 }
 
 export interface TriggerResult {

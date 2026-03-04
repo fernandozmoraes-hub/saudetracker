@@ -14,6 +14,48 @@ export type Database = {
   }
   public: {
     Tables: {
+      alcohol_intake: {
+        Row: {
+          abv_percent: number
+          alcohol_grams: number
+          created_at: string
+          date: string
+          drink_type: string
+          id: string
+          notes: string | null
+          num_drinks: number
+          time: string | null
+          user_id: string
+          volume_ml: number
+        }
+        Insert: {
+          abv_percent: number
+          alcohol_grams: number
+          created_at?: string
+          date: string
+          drink_type: string
+          id?: string
+          notes?: string | null
+          num_drinks?: number
+          time?: string | null
+          user_id: string
+          volume_ml: number
+        }
+        Update: {
+          abv_percent?: number
+          alcohol_grams?: number
+          created_at?: string
+          date?: string
+          drink_type?: string
+          id?: string
+          notes?: string | null
+          num_drinks?: number
+          time?: string | null
+          user_id?: string
+          volume_ml?: number
+        }
+        Relationships: []
+      }
       body_composition: {
         Row: {
           body_fat_pct: number
@@ -58,6 +100,7 @@ export type Database = {
       }
       daily_checks: {
         Row: {
+          alcohol_yesterday: boolean | null
           body_battery: number | null
           created_at: string
           date: string
@@ -72,6 +115,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          alcohol_yesterday?: boolean | null
           body_battery?: number | null
           created_at?: string
           date: string
@@ -86,6 +130,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          alcohol_yesterday?: boolean | null
           body_battery?: number | null
           created_at?: string
           date?: string

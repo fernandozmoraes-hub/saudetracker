@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { buildAnalysisData } from '@/lib/analysisData';
 import { getClassificationEmoji, getClassificationLabel, TriggerResult } from '@/lib/triggers';
 import { useData } from '@/hooks/useData';
+import { useAlcoholIntake } from '@/hooks/useAlcoholIntake';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -17,6 +18,7 @@ interface AICoachState {
 
 export function AICoach() {
   const { dailyChecks, workouts } = useData();
+  const { entries: alcoholEntries } = useAlcoholIntake();
   const [state, setState] = useState<AICoachState>({
     analysis: null,
     classification: 'blocked',
@@ -28,7 +30,7 @@ export function AICoach() {
   const fetchAnalysis = async () => {
     setState(prev => ({ ...prev, isLoading: true, error: null }));
     
-    const { data: analysisData, triggerResult } = buildAnalysisData(dailyChecks, workouts);
+    const { data: analysisData, triggerResult } = buildAnalysisData(dailyChecks, workouts, alcoholEntries);
     
     if (!triggerResult.canProceed || !analysisData) {
       setState({
@@ -75,7 +77,7 @@ export function AICoach() {
 
   useEffect(() => {
     // Auto-fetch when data changes and we have today's check
-    const { triggerResult } = buildAnalysisData(dailyChecks, workouts);
+    const { triggerResult } = buildAnalysisData(dailyChecks, workouts, alcoholEntries);
     if (triggerResult.canProceed) {
       fetchAnalysis();
     } else {
@@ -85,7 +87,7 @@ export function AICoach() {
         analysis: 'Dados insuficientes para avaliação segura.',
       }));
     }
-  }, [dailyChecks, workouts]);
+  }, [dailyChecks, workouts, alcoholEntries]);
 
   const getClassificationStyles = (classification: TriggerResult['classification']) => {
     switch (classification) {
