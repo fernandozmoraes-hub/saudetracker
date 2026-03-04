@@ -7,6 +7,7 @@ export interface DailyCheck {
   mood?: number; // 1-5
   bodyBattery?: number; // 0-100
   notes?: string;
+  alcoholYesterday?: boolean;
 }
 
 export type WorkoutType = 'Run' | 'Strength' | 'Bike' | 'Rest';
@@ -118,6 +119,23 @@ export interface BodyCompositionEntry {
 }
 
 // Equipment (Running Shoes) types
+// Alcohol types
+export type DrinkType = 'beer' | 'wine';
+export type AlcoholImpact = 'none' | 'light' | 'moderate' | 'high' | 'very_high';
+
+export interface AlcoholIntakeEntry {
+  id: string;
+  userId: string;
+  date: string;
+  time?: string;
+  drinkType: DrinkType;
+  volumeMl: number;
+  numDrinks: number;
+  abvPercent: number;
+  alcoholGrams: number;
+  notes?: string;
+}
+
 export type EquipmentStatus = 'active' | 'attention' | 'retired';
 
 export interface Equipment {

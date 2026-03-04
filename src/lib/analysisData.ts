@@ -1,9 +1,10 @@
 import { format, subDays } from 'date-fns';
-import { DailyCheck, Workout } from '@/types/health';
+import { DailyCheck, Workout, AlcoholIntakeEntry } from '@/types/health';
 import { getHRVMetrics, calculateATL, calculateCTL, getHRVBaseline7d } from './calculations';
 import { AnalysisData, TriggerResult, evaluateTriggers } from './triggers';
+import { getDailyTotal, getAlcoholImpact, getImpactLabel, getConsecutiveDrinkingDays } from './alcoholCalcs';
 
-export function buildAnalysisData(dailyChecks: DailyCheck[], workouts: Workout[]): { data: AnalysisData | null; triggerResult: TriggerResult } {
+export function buildAnalysisData(dailyChecks: DailyCheck[], workouts: Workout[], alcoholEntries?: AlcoholIntakeEntry[]): { data: AnalysisData | null; triggerResult: TriggerResult } {
   const today = format(new Date(), 'yyyy-MM-dd');
   
   const todayCheck = dailyChecks.find(c => c.date === today);
@@ -100,7 +101,23 @@ export function buildAnalysisData(dailyChecks: DailyCheck[], workouts: Workout[]
     },
     recentWorkouts,
   };
-  
+
+  // Add alcohol context if entries provided
+  if (alcoholEntries && alcoholEntries.length > 0) {
+    const yesterday = format(subDays(new Date(), 1), 'yyyy-MM-dd');
+    const yesterdayGrams = getDailyTotal(alcoholEntries, yesterday);
+    const impact = getAlcoholImpact(yesterdayGrams);
+    const consecutiveDrinkingDays = getConsecutiveDrinkingDays(alcoholEntries);
+
+    if (yesterdayGrams > 0 || consecutiveDrinkingDays > 0) {
+      analysisData.alcoholContext = {
+        yesterdayGrams,
+        impact: getImpactLabel(impact),
+        consecutiveDrinkingDays,
+      };
+    }
+  }
+
   const triggerResult = evaluateTriggers(analysisData);
   
   return { data: analysisData, triggerResult };

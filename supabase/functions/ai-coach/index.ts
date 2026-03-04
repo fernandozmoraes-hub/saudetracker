@@ -43,11 +43,18 @@ const TrendsSchema = z.object({
   atlTrend5d: z.string().max(20),
 });
 
+const AlcoholContextSchema = z.object({
+  yesterdayGrams: z.number().min(0).max(1000),
+  impact: z.string().max(50),
+  consecutiveDrinkingDays: z.number().min(0).max(365),
+}).optional();
+
 const AnalysisDataSchema = z.object({
   today: TodayDataSchema,
   trainingLoad: TrainingLoadSchema,
   trends: TrendsSchema,
   recentWorkouts: z.array(WorkoutSchema).max(30),
+  alcoholContext: AlcoholContextSchema,
 });
 
 const TriggerResultSchema = z.object({
@@ -235,6 +242,12 @@ ${workoutsText}
 ## ALERTAS DO SISTEMA:
 ${alertsText}
 
+${analysisData.alcoholContext ? `
+## CONTEXTO DE ÁLCOOL:
+- Carga alcoólica do dia anterior: ${analysisData.alcoholContext.yesterdayGrams}g
+- Classificação: ${analysisData.alcoholContext.impact}
+- Dias consecutivos com consumo: ${analysisData.alcoholContext.consecutiveDrinkingDays}
+` : ''}
 Forneça sua análise seguindo o formato obrigatório: RESUMO → INTERPRETAÇÃO → IMPACTO FATORES EXTERNOS (se aplicável) → O QUE MONITORAR.`;
 };
 

@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { useUserSettings } from '@/hooks/useUserSettings';
 import { useStravaConnection } from '@/hooks/useStravaConnection';
 import { useToast } from '@/hooks/use-toast';
-import { Heart, Save, Info, Loader2, Activity, Dumbbell, Zap, Link2, Unlink, CheckCircle2, Footprints, ChevronRight, Scale } from 'lucide-react';
+import { Heart, Save, Info, Loader2, Activity, Dumbbell, Zap, Link2, Unlink, CheckCircle2, Footprints, ChevronRight, Scale, Wine } from 'lucide-react';
 import { DEFAULT_LTHR, DEFAULT_ZONE_THRESHOLDS, getHrZones, ZONE_WEIGHTS } from '@/lib/calculations';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Link } from 'react-router-dom';
@@ -429,6 +429,26 @@ export default function Settings() {
                 <h3 className="font-display font-semibold">Equipamentos</h3>
                 <p className="text-sm text-muted-foreground">
                   Gerencie seus tênis de corrida
+                </p>
+              </div>
+            </div>
+            <ChevronRight className="w-5 h-5 text-muted-foreground" />
+          </div>
+        </div>
+      </Link>
+
+      {/* Alcohol Intake Section */}
+      <Link to="/alcohol-intake">
+        <div className="gradient-card rounded-xl p-5 border border-border/50 hover:border-primary/50 transition-all animate-slide-up cursor-pointer">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-purple-500/10">
+                <Wine className="w-5 h-5 text-purple-500" />
+              </div>
+              <div>
+                <h3 className="font-display font-semibold">Consumo de Álcool</h3>
+                <p className="text-sm text-muted-foreground">
+                  Monitore cerveja e vinho
                 </p>
               </div>
             </div>

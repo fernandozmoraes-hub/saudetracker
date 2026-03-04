@@ -1,23 +1,30 @@
 import { useState, useEffect } from 'react';
-import { format } from 'date-fns';
+import { format, subDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Switch } from '@/components/ui/switch';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { useData } from '@/hooks/useData';
+import { useAlcoholIntake } from '@/hooks/useAlcoholIntake';
 import { getHRVBaseline7d, getHRVStatus } from '@/lib/calculations';
+import { getAlcoholFlag } from '@/lib/alcoholCalcs';
 import { DailyCheck } from '@/types/health';
 import { useToast } from '@/hooks/use-toast';
-import { Heart, Moon, Brain, Save, Battery } from 'lucide-react';
+import { Heart, Moon, Brain, Save, Battery, Wine } from 'lucide-react';
 
 export default function CheckIn() {
   const today = format(new Date(), 'yyyy-MM-dd');
   const { toast } = useToast();
   const { dailyChecks, saveDailyCheck } = useData();
   
+  const { getYesterdayTotal } = useAlcoholIntake();
+  const yesterdayGrams = getYesterdayTotal();
+  const alcoholFlag = getAlcoholFlag(yesterdayGrams);
+
   const [formData, setFormData] = useState<Partial<DailyCheck>>({
     date: today,
     hrv: undefined,
@@ -27,6 +34,7 @@ export default function CheckIn() {
     mood: 3,
     bodyBattery: undefined,
     notes: '',
+    alcoholYesterday: false,
   });
   
   const [hrvStatus, setHrvStatus] = useState<{ status: ReturnType<typeof getHRVStatus>; baseline: number } | null>(null);
@@ -69,6 +77,7 @@ export default function CheckIn() {
       mood: formData.mood,
       bodyBattery: formData.bodyBattery,
       notes: formData.notes,
+      alcoholYesterday: formData.alcoholYesterday,
     };
     
     const success = await saveDailyCheck(check);
@@ -235,6 +244,28 @@ export default function CheckIn() {
           </div>
         </div>
         
+        {/* Alcohol yesterday toggle */}
+        <div className="gradient-card rounded-xl p-4 border border-border/50 space-y-3">
+          <div className="flex items-center justify-between">
+            <Label htmlFor="alcoholYesterday" className="flex items-center gap-2 cursor-pointer">
+              <Wine className="w-4 h-4 text-purple-500" />
+              Consumiu álcool nas últimas 24h?
+            </Label>
+            <Switch
+              id="alcoholYesterday"
+              checked={formData.alcoholYesterday || false}
+              onCheckedChange={(checked) => setFormData({ ...formData, alcoholYesterday: checked })}
+            />
+          </div>
+          {alcoholFlag && (
+            <div className={`text-sm font-medium px-3 py-2 rounded-lg ${
+              yesterdayGrams > 60 ? 'bg-red-500/10 text-red-500' : 'bg-orange-500/10 text-orange-500'
+            }`}>
+              {alcoholFlag}
+            </div>
+          )}
+        </div>
+
         <div className="space-y-2">
           <Label htmlFor="notes">Notas (opcional)</Label>
           <Textarea
