@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAlcoholIntake } from '@/hooks/useAlcoholIntake';
+import { useData } from '@/hooks/useData';
 import { useToast } from '@/hooks/use-toast';
 import {
   calculateAlcoholGrams,
@@ -18,13 +19,21 @@ import {
   getImpactBgColor,
   getWeeklyStats,
   getDailyTotal,
+  getAlcoholHRVCorrelation,
+  getCorrelationColor,
+  getCorrelationBgColor,
+  getWeeklyPattern,
+  getWeeklyPatternColor,
+  getPerformanceAlert,
+  getTrendArrow,
 } from '@/lib/alcoholCalcs';
 import { DrinkType } from '@/types/health';
-import { Wine, Beer, Plus, Trash2, Loader2, TrendingDown, Calendar } from 'lucide-react';
+import { Wine, Beer, Plus, Trash2, Loader2, TrendingDown, Calendar, Activity, AlertTriangle } from 'lucide-react';
 
 export default function AlcoholIntake() {
   const { toast } = useToast();
   const { entries, isLoading, saveEntry, deleteEntry } = useAlcoholIntake();
+  const { dailyChecks } = useData();
   const today = format(new Date(), 'yyyy-MM-dd');
 
   const [date, setDate] = useState(today);
@@ -40,6 +49,17 @@ export default function AlcoholIntake() {
   const impact = getAlcoholImpact(calculatedGrams);
 
   const weeklyStats = useMemo(() => getWeeklyStats(entries), [entries]);
+
+  // Correlation & pattern analysis
+  const correlation = useMemo(
+    () => getAlcoholHRVCorrelation(entries, dailyChecks.map(c => ({ date: c.date, hrv: c.hrv }))),
+    [entries, dailyChecks]
+  );
+  const weeklyPattern = useMemo(() => getWeeklyPattern(entries), [entries]);
+  const performanceAlert = useMemo(
+    () => getPerformanceAlert(correlation, weeklyPattern.avgWeekly, correlation?.pairs),
+    [correlation, weeklyPattern.avgWeekly]
+  );
 
   // Group entries by date for history
   const groupedEntries = useMemo(() => {
@@ -137,6 +157,67 @@ export default function AlcoholIntake() {
             </p>
           </div>
         </div>
+      </div>
+
+      {/* Correlation & Pattern Analysis */}
+      <div className="gradient-card rounded-xl p-6 border border-border/50 animate-slide-up space-y-4">
+        <h3 className="font-display font-semibold flex items-center gap-2">
+          <Activity className="w-5 h-5 text-primary" />
+          Impacto do Álcool na Recuperação
+        </h3>
+
+        {correlation ? (
+          <>
+            <div className="grid grid-cols-2 gap-4">
+              <div className={`rounded-lg p-3 ${getCorrelationBgColor(correlation.classification)}`}>
+                <p className="text-xs text-muted-foreground">Correlação (r)</p>
+                <p className={`text-2xl font-bold ${getCorrelationColor(correlation.classification)}`}>
+                  {correlation.r.toFixed(2)}
+                </p>
+              </div>
+              <div className={`rounded-lg p-3 ${getCorrelationBgColor(correlation.classification)}`}>
+                <p className="text-xs text-muted-foreground">Classificação</p>
+                <p className={`text-sm font-bold ${getCorrelationColor(correlation.classification)}`}>
+                  {correlation.label}
+                </p>
+              </div>
+              <div className="rounded-lg p-3 bg-secondary">
+                <p className="text-xs text-muted-foreground">Amostra</p>
+                <p className="text-2xl font-bold">{correlation.sampleSize}</p>
+              </div>
+              <div className="rounded-lg p-3 bg-secondary">
+                <p className="text-xs text-muted-foreground">Tendência 4 sem</p>
+                <p className="text-2xl font-bold">
+                  {getTrendArrow(weeklyPattern.trend)}
+                </p>
+              </div>
+            </div>
+
+            <div className={`rounded-lg p-3 ${getWeeklyPatternColor(weeklyPattern.pattern) === 'text-green-500' ? 'bg-green-500/10' : getWeeklyPatternColor(weeklyPattern.pattern) === 'text-yellow-500' ? 'bg-yellow-500/10' : 'bg-red-500/10'}`}>
+              <p className="text-xs text-muted-foreground">Padrão de Consumo</p>
+              <p className={`text-lg font-bold ${getWeeklyPatternColor(weeklyPattern.pattern)}`}>
+                {weeklyPattern.label}
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                {weeklyPattern.daysWithConsumption} dias esta semana · média {weeklyPattern.avgWeekly}g/sem
+              </p>
+            </div>
+
+            {performanceAlert && (
+              <div className="flex items-start gap-3 p-4 rounded-xl bg-red-500/10 border border-red-500/30">
+                <AlertTriangle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-semibold text-red-500">Alerta Performance</p>
+                  <p className="text-sm text-muted-foreground">{performanceAlert}</p>
+                </div>
+              </div>
+            )}
+          </>
+        ) : (
+          <p className="text-sm text-muted-foreground text-center py-4">
+            Dados insuficientes (mínimo 10 eventos com consumo e check-in no dia seguinte)
+          </p>
+        )}
       </div>
 
       {/* Registration Form */}

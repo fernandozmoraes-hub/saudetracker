@@ -47,6 +47,11 @@ const AlcoholContextSchema = z.object({
   yesterdayGrams: z.number().min(0).max(1000),
   impact: z.string().max(50),
   consecutiveDrinkingDays: z.number().min(0).max(365),
+  correlationR: z.number().min(-1).max(1).optional(),
+  correlationClassification: z.string().max(100).optional(),
+  weeklyAvgGrams: z.number().min(0).max(5000).optional(),
+  weeklyPattern: z.string().max(100).optional(),
+  weeklyTrend: z.string().max(20).optional(),
 }).optional();
 
 const AnalysisDataSchema = z.object({
@@ -247,6 +252,11 @@ ${analysisData.alcoholContext ? `
 - Carga alcoólica do dia anterior: ${analysisData.alcoholContext.yesterdayGrams}g
 - Classificação: ${analysisData.alcoholContext.impact}
 - Dias consecutivos com consumo: ${analysisData.alcoholContext.consecutiveDrinkingDays}
+${analysisData.alcoholContext.correlationR !== undefined ? `- Correlação Álcool × HRV (r): ${analysisData.alcoholContext.correlationR}` : ''}
+${analysisData.alcoholContext.correlationClassification ? `- Classificação da correlação: ${analysisData.alcoholContext.correlationClassification}` : ''}
+${analysisData.alcoholContext.weeklyAvgGrams !== undefined ? `- Média semanal: ${analysisData.alcoholContext.weeklyAvgGrams}g` : ''}
+${analysisData.alcoholContext.weeklyPattern ? `- Padrão de consumo: ${analysisData.alcoholContext.weeklyPattern}` : ''}
+${analysisData.alcoholContext.weeklyTrend ? `- Tendência: ${analysisData.alcoholContext.weeklyTrend}` : ''}
 ` : ''}
 Forneça sua análise seguindo o formato obrigatório: RESUMO → INTERPRETAÇÃO → IMPACTO FATORES EXTERNOS (se aplicável) → O QUE MONITORAR.`;
 };
