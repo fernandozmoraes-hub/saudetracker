@@ -22,6 +22,7 @@ import WorkoutReview from "./pages/WorkoutReview";
 import Equipment from "./pages/Equipment";
 import BodyComposition from "./pages/BodyComposition";
 import AlcoholIntake from "./pages/AlcoholIntake";
+import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -50,6 +51,7 @@ const App = () => (
                     <Route path="/equipment" element={<ProtectedRoute><Equipment /></ProtectedRoute>} />
                     <Route path="/body-composition" element={<ProtectedRoute><BodyComposition /></ProtectedRoute>} />
                     <Route path="/alcohol-intake" element={<ProtectedRoute><AlcoholIntake /></ProtectedRoute>} />
+                    <Route path="/reset-password" element={<ResetPassword />} />
                     <Route path="/install" element={<Install />} />
                     <Route path="*" element={<NotFound />} />
                   </Routes>
