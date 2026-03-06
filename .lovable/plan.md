@@ -1,76 +1,106 @@
 
 
-## Plano: Google OAuth + Melhorias na Autenticacao
+## Plano: Correlacao Alcool x HRV e Alertas Inteligentes
 
-### Contexto
+### Visao Geral
 
-O app ja possui autenticacao email/senha funcional (useAuth, Auth.tsx, ProtectedRoute). O plano adiciona Google OAuth e melhora a UX da tela de login conforme solicitado.
+Expandir o modulo de alcool com correlacao estatistica (Pearson) entre consumo e variacao de HRV, deteccao de padroes semanais, alertas inteligentes e integracao ao Dashboard e Agente Fisiologico. Todos os calculos sao frontend-only usando dados ja disponiveis (alcohol_intake + daily_checks). Nenhuma alteracao no banco de dados.
 
-### Importante: O que o Lovable Cloud ja gerencia
+---
 
-Muitos dos requisitos listados (bcrypt/argon2, httpOnly cookies, rate limiting, JWT expiration, middleware) sao gerenciados automaticamente pelo backend de autenticacao do Lovable Cloud. Nao precisamos implementar isso manualmente — o sistema ja cuida de:
-- Hash seguro de senhas (bcrypt)
-- Sessoes JWT com refresh automatico
-- Protecao contra brute force (rate limiting nativo)
-- Armazenamento seguro de tokens
+### Parte 1: Funcoes de Correlacao em `src/lib/alcoholCalcs.ts`
 
-### Alteracoes
+Adicionar funcoes:
 
-**1. PWA: Adicionar `/~oauth` ao denylist do service worker**
+- **`calculateDeltaHRV(hrv, baseline)`** — `((hrv - baseline) / baseline) * 100`
+- **`calculatePearsonCorrelation(pairs: {x, y}[])`** — coeficiente r padrao
+- **`getAlcoholHRVCorrelation(alcoholEntries, dailyChecks)`** — janela movel 30 dias, correlaciona carga do dia N com ΔHRV do dia N+1. Retorna `{ r, classification, sampleSize, pairs }`. So calcula se >= 10 eventos com consumo > 0g
+- **`classifyCorrelation(r)`** — retorna string:
+  - |r| < 0.2: "Sem correlacao relevante"
+  - -0.2 a -0.4: "Correlacao negativa leve"
+  - -0.4 a -0.6: "Correlacao negativa moderada"
+  - < -0.6: "Correlacao negativa forte"
+- **`getWeeklyPattern(entries)`** — analisa ultimas 4 semanas. Retorna `{ pattern, weeklyTotals, avgWeekly, daysWithConsumption, trend }`:
+  - "Padrao de Risco": >=60g/semana OU >=5 dias consumo
+  - "Padrao Elevado": >=3 dias/semana OU media >40g OU crescimento >20% em 3 semanas
+  - "Controlado": demais
+- **`getPerformanceAlert(correlation, weeklyAvg, deltaHRVEvents)`** — retorna string de alerta ou null:
+  - Correlacao moderada/forte + media >30g: "Possivel impacto consistente na recuperacao autonomica."
+  - Correlacao forte + quedas >10% em multiplos eventos: "Padrao fisiologico consistente de impacto na recuperacao."
 
-`vite.config.ts` — adicionar `navigateFallbackDenylist: [/^\/~oauth/]` ao workbox config para que redirecionamentos OAuth nunca sejam cacheados pelo service worker.
+---
 
-**2. Configurar Google OAuth**
+### Parte 2: Pagina AlcoholIntake.tsx — Nova Secao de Correlacao
 
-Usar a ferramenta `Configure Social Auth` para gerar o modulo `src/integrations/lovable/` com suporte a Google OAuth gerenciado pelo Lovable Cloud. Nenhuma API key necessaria.
+Adicionar entre o Resumo Semanal e o Formulario:
 
-**3. Atualizar `src/hooks/useAuth.tsx`**
+**Card "Impacto do Alcool na Recuperacao"** com:
+- Correlacao (r) com 2 casas decimais
+- Classificacao textual com cor (verde/amarelo/vermelho)
+- Tamanho da amostra (N eventos)
+- Media semanal atual
+- Tendencia das ultimas 4 semanas (seta ↑ ↓ →)
+- Padrao de Consumo (badge: Controlado / Padrao Elevado / Padrao de Risco)
+- Alerta de Performance (se aplicavel, box destacado)
+- Mensagem "Dados insuficientes" se < 10 eventos
 
-- Adicionar funcao `signInWithGoogle()` que chama `lovable.auth.signInWithOAuth("google", { redirect_uri: window.location.origin })`
-- Adicionar funcao `resetPassword(email)` que chama `supabase.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin + '/reset-password' })`
-- Exportar ambas no contexto
+---
 
-**4. Redesenhar `src/pages/Auth.tsx`**
+### Parte 3: Dashboard (Today.tsx) — Card de Alcool
 
-Nova estrutura da tela:
-- Titulo: "Performance Health Dashboard"
-- Botao principal: "Entrar com Google" (azul, com icone Google)
-- Separador: "OU"
-- Campos Email + Senha
-- Botoes: Entrar / Criar conta
-- Link: "Esqueci minha senha" (abre modal ou estado inline para digitar email e enviar reset)
-- Validacao de senha mais forte no cadastro: min 8 chars, 1 maiuscula, 1 numero, 1 especial
+Adicionar novo card **apos o AI Coach e antes dos Trend Charts**:
 
-**5. Criar pagina `/reset-password`**
+**Card "🍷 Impacto do Alcool"** (compacto):
+- Correlacao (r) + classificacao
+- Media semanal + tendencia
+- Cores automaticas: verde (sem correlacao), amarelo (leve/moderada), vermelho (forte)
+- So exibe se houver dados suficientes (>= 10 eventos)
+- Usa `useAlcoholIntake` + `useData` para calcular
 
-Novo arquivo `src/pages/ResetPassword.tsx`:
-- Detecta `type=recovery` no URL hash
-- Mostra formulario para nova senha
-- Chama `supabase.auth.updateUser({ password })`
-- Redireciona para login apos sucesso
+---
 
-**6. Adicionar rota em `src/App.tsx`**
+### Parte 4: Integracao com Agente Fisiologico
 
-- Adicionar `<Route path="/reset-password" element={<ResetPassword />} />` (rota publica)
+**`src/lib/triggers.ts`** — Expandir `AnalysisData.alcoholContext`:
+```typescript
+alcoholContext?: {
+  yesterdayGrams: number;
+  impact: string;
+  consecutiveDrinkingDays: number;
+  // NOVOS:
+  correlationR?: number;
+  correlationClassification?: string;
+  weeklyAvgGrams?: number;
+  weeklyPattern?: string;
+  weeklyTrend?: string;
+}
+```
 
-**7. Logout no Settings**
+**`src/lib/analysisData.ts`** — Calcular e adicionar os novos campos ao `alcoholContext`
 
-O logout ja existe via `useAuth().signOut()`. Verificar se o botao de logout esta presente na pagina Settings — se nao, adicionar.
+**`src/components/AICoach.tsx`** — Sem alteracao (ja passa `alcoholEntries` para `buildAnalysisData`)
 
-### Arquivos a Criar/Modificar
+**`supabase/functions/ai-coach/index.ts`**:
+- Expandir `AlcoholContextSchema` com campos opcionais: `correlationR`, `correlationClassification`, `weeklyAvgGrams`, `weeklyPattern`, `weeklyTrend`
+- Expandir secao "CONTEXTO DE ALCOOL" no user prompt com os novos dados
+- System prompt ja cobre alcool — nenhuma alteracao
+
+---
+
+### Parte 5: Arquivos a Criar/Modificar
 
 | Arquivo | Acao |
 |---------|------|
-| `vite.config.ts` | Adicionar navigateFallbackDenylist para /~oauth |
-| `src/integrations/lovable/` | Gerado pela ferramenta Configure Social Auth |
-| `src/hooks/useAuth.tsx` | Adicionar signInWithGoogle + resetPassword |
-| `src/pages/Auth.tsx` | Redesenhar com Google button + esqueci senha |
-| `src/pages/ResetPassword.tsx` | Criar pagina de reset de senha |
-| `src/App.tsx` | Adicionar rota /reset-password |
+| `src/lib/alcoholCalcs.ts` | Adicionar funcoes de correlacao, padrao semanal e alertas |
+| `src/pages/AlcoholIntake.tsx` | Adicionar card de correlacao e alertas |
+| `src/pages/Today.tsx` | Adicionar card compacto de impacto do alcool |
+| `src/lib/triggers.ts` | Expandir tipo alcoholContext |
+| `src/lib/analysisData.ts` | Calcular e popular novos campos |
+| `supabase/functions/ai-coach/index.ts` | Aceitar novos campos no schema e prompt |
 
-### Nao sera alterado
-- Banco de dados (auth.users gerenciado pelo Lovable Cloud)
-- ProtectedRoute (ja funciona)
-- Edge functions
-- Logica de TSS/CTL/ATL/TSB
+### Nao Sera Alterado
+- CTL/ATL/TSB/TSS
+- Banco de dados (tudo calculado no frontend)
+- System prompt do ai-coach
+- Workout evaluator / Muscle integrity agent
 
