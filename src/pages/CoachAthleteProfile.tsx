@@ -99,27 +99,27 @@ export default function CoachAthleteProfile() {
         {/* Metrics Overview */}
         <div className="grid grid-cols-2 gap-3">
           <MetricCard
-            title="HRV Atual"
+            label="HRV Atual"
             value={latestCheck?.hrv ?? '—'}
             icon={<Heart className="w-4 h-4" />}
-            subtitle={hrvBaseline ? `Baseline: ${hrvBaseline}` : undefined}
+            unit={hrvBaseline ? `Baseline: ${hrvBaseline}` : undefined}
           />
           <MetricCard
-            title="FC Repouso"
+            label="FC Repouso"
             value={latestCheck?.resting_hr ?? '—'}
             icon={<Activity className="w-4 h-4" />}
-            subtitle="bpm"
+            unit="bpm"
           />
           <MetricCard
-            title="TSS Semanal"
+            label="TSS Semanal"
             value={Math.round(weeklyTSS)}
             icon={<TrendingUp className="w-4 h-4" />}
           />
           <MetricCard
-            title="Sono"
+            label="Sono"
             value={latestCheck?.sleep_hours ? `${Number(latestCheck.sleep_hours).toFixed(1)}h` : '—'}
             icon={<Moon className="w-4 h-4" />}
-            subtitle={latestCheck?.sleep_quality ? `Qualidade: ${latestCheck.sleep_quality}/5` : undefined}
+            unit={latestCheck?.sleep_quality ? `Qualidade: ${latestCheck.sleep_quality}/5` : undefined}
           />
         </div>
 

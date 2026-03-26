@@ -1,8 +1,9 @@
 import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
-import { Heart, Dumbbell, Home, Calendar, Scale, Settings } from 'lucide-react';
+import { Heart, Dumbbell, Home, Calendar, Scale, Settings, LayoutDashboard, Users, ClipboardList } from 'lucide-react';
+import { useUserRole } from '@/hooks/useUserRole';
 
-const navItems = [
+const athleteNavItems = [
   { path: '/checkin', label: 'Check-in', icon: Heart },
   { path: '/workout', label: 'Treino', icon: Dumbbell },
   { path: '/', label: 'Hoje', icon: Home },
@@ -11,8 +12,18 @@ const navItems = [
   { path: '/settings', label: 'Config', icon: Settings },
 ];
 
+const coachNavItems = [
+  { path: '/coach', label: 'Dashboard', icon: LayoutDashboard },
+  { path: '/coach/prescribe', label: 'Prescrever', icon: ClipboardList },
+  { path: '/settings', label: 'Config', icon: Settings },
+];
+
 export function BottomNav() {
   const location = useLocation();
+  const { isCoach, isLoading } = useUserRole();
+
+  // EMENDA 2: fallback para nav de atleta enquanto carrega
+  const navItems = (!isLoading && isCoach) ? coachNavItems : athleteNavItems;
   
   return (
     <nav className="fixed bottom-0 left-0 right-0 bg-card/95 backdrop-blur-lg border-t border-border z-50">
