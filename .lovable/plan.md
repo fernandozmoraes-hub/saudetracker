@@ -1,106 +1,160 @@
 
 
-## Plano: Correlacao Alcool x HRV e Alertas Inteligentes
+## Plano Revisado: Plataforma de Coaching Multi-Atleta (com Emendas 1 e 2)
 
-### Visao Geral
+### Emendas Incorporadas
 
-Expandir o modulo de alcool com correlacao estatistica (Pearson) entre consumo e variacao de HRV, deteccao de padroes semanais, alertas inteligentes e integracao ao Dashboard e Agente Fisiologico. Todos os calculos sao frontend-only usando dados ja disponiveis (alcohol_intake + daily_checks). Nenhuma alteracao no banco de dados.
+**Emenda 1 — Migração para usuários existentes:** A migration SQL incluirá um `INSERT INTO user_roles` que atribui `athlete` a todos os usuários já existentes em `auth.users`, garantindo que ninguém fique preso na tela de seleção de role.
 
----
-
-### Parte 1: Funcoes de Correlacao em `src/lib/alcoholCalcs.ts`
-
-Adicionar funcoes:
-
-- **`calculateDeltaHRV(hrv, baseline)`** — `((hrv - baseline) / baseline) * 100`
-- **`calculatePearsonCorrelation(pairs: {x, y}[])`** — coeficiente r padrao
-- **`getAlcoholHRVCorrelation(alcoholEntries, dailyChecks)`** — janela movel 30 dias, correlaciona carga do dia N com ΔHRV do dia N+1. Retorna `{ r, classification, sampleSize, pairs }`. So calcula se >= 10 eventos com consumo > 0g
-- **`classifyCorrelation(r)`** — retorna string:
-  - |r| < 0.2: "Sem correlacao relevante"
-  - -0.2 a -0.4: "Correlacao negativa leve"
-  - -0.4 a -0.6: "Correlacao negativa moderada"
-  - < -0.6: "Correlacao negativa forte"
-- **`getWeeklyPattern(entries)`** — analisa ultimas 4 semanas. Retorna `{ pattern, weeklyTotals, avgWeekly, daysWithConsumption, trend }`:
-  - "Padrao de Risco": >=60g/semana OU >=5 dias consumo
-  - "Padrao Elevado": >=3 dias/semana OU media >40g OU crescimento >20% em 3 semanas
-  - "Controlado": demais
-- **`getPerformanceAlert(correlation, weeklyAvg, deltaHRVEvents)`** — retorna string de alerta ou null:
-  - Correlacao moderada/forte + media >30g: "Possivel impacto consistente na recuperacao autonomica."
-  - Correlacao forte + quedas >10% em multiplos eventos: "Padrao fisiologico consistente de impacto na recuperacao."
+**Emenda 2 — Salvaguarda da BottomNav:** Enquanto `useUserRole` estiver com `isLoading = true`, a BottomNav renderiza a navegação padrão de atleta (a atual). Só exibe navegação de coach quando `isCoach === true` e `isLoading === false`.
 
 ---
 
-### Parte 2: Pagina AlcoholIntake.tsx — Nova Secao de Correlacao
+### Parte 1: Banco de Dados (Migration SQL)
 
-Adicionar entre o Resumo Semanal e o Formulario:
+**1.1 Criar tipo, tabelas e funções**
 
-**Card "Impacto do Alcool na Recuperacao"** com:
-- Correlacao (r) com 2 casas decimais
-- Classificacao textual com cor (verde/amarelo/vermelho)
-- Tamanho da amostra (N eventos)
-- Media semanal atual
-- Tendencia das ultimas 4 semanas (seta ↑ ↓ →)
-- Padrao de Consumo (badge: Controlado / Padrao Elevado / Padrao de Risco)
-- Alerta de Performance (se aplicavel, box destacado)
-- Mensagem "Dados insuficientes" se < 10 eventos
+```sql
+-- Tipo de role
+CREATE TYPE public.app_role AS ENUM ('coach', 'athlete');
 
----
+-- Tabela user_roles (nunca no perfil)
+CREATE TABLE public.user_roles (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+  role app_role NOT NULL,
+  UNIQUE (user_id, role)
+);
+ALTER TABLE public.user_roles ENABLE ROW LEVEL SECURITY;
 
-### Parte 3: Dashboard (Today.tsx) — Card de Alcool
+-- Função security definer para checar role sem recursão RLS
+CREATE OR REPLACE FUNCTION public.has_role(_user_id uuid, _role app_role)
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = public AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.user_roles WHERE user_id = _user_id AND role = _role
+  )
+$$;
 
-Adicionar novo card **apos o AI Coach e antes dos Trend Charts**:
+-- Função para checar relação coach-atleta
+CREATE OR REPLACE FUNCTION public.is_coach_of(_coach_id uuid, _athlete_id uuid)
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = public AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.coach_athletes
+    WHERE coach_id = _coach_id AND athlete_id = _athlete_id AND status = 'active'
+  )
+$$;
 
-**Card "🍷 Impacto do Alcool"** (compacto):
-- Correlacao (r) + classificacao
-- Media semanal + tendencia
-- Cores automaticas: verde (sem correlacao), amarelo (leve/moderada), vermelho (forte)
-- So exibe se houver dados suficientes (>= 10 eventos)
-- Usa `useAlcoholIntake` + `useData` para calcular
+-- EMENDA 1: Migrar usuários existentes como athlete
+INSERT INTO public.user_roles (user_id, role)
+SELECT id, 'athlete'::app_role FROM auth.users
+ON CONFLICT (user_id, role) DO NOTHING;
 
----
+-- Tabela coach_athletes
+CREATE TABLE public.coach_athletes (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  coach_id uuid NOT NULL,
+  athlete_id uuid NOT NULL,
+  status text NOT NULL DEFAULT 'pending',
+  created_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (coach_id, athlete_id)
+);
+ALTER TABLE public.coach_athletes ENABLE ROW LEVEL SECURITY;
 
-### Parte 4: Integracao com Agente Fisiologico
-
-**`src/lib/triggers.ts`** — Expandir `AnalysisData.alcoholContext`:
-```typescript
-alcoholContext?: {
-  yesterdayGrams: number;
-  impact: string;
-  consecutiveDrinkingDays: number;
-  // NOVOS:
-  correlationR?: number;
-  correlationClassification?: string;
-  weeklyAvgGrams?: number;
-  weeklyPattern?: string;
-  weeklyTrend?: string;
-}
+-- Tabela training_plans
+CREATE TABLE public.training_plans (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  coach_id uuid NOT NULL,
+  athlete_id uuid NOT NULL,
+  date date NOT NULL,
+  type text NOT NULL,
+  planned_duration_min numeric,
+  planned_zone text,
+  planned_tss numeric,
+  notes text,
+  status text NOT NULL DEFAULT 'planned',
+  workout_id uuid,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+ALTER TABLE public.training_plans ENABLE ROW LEVEL SECURITY;
 ```
 
-**`src/lib/analysisData.ts`** — Calcular e adicionar os novos campos ao `alcoholContext`
+**1.2 RLS policies**
 
-**`src/components/AICoach.tsx`** — Sem alteracao (ja passa `alcoholEntries` para `buildAnalysisData`)
-
-**`supabase/functions/ai-coach/index.ts`**:
-- Expandir `AlcoholContextSchema` com campos opcionais: `correlationR`, `correlationClassification`, `weeklyAvgGrams`, `weeklyPattern`, `weeklyTrend`
-- Expandir secao "CONTEXTO DE ALCOOL" no user prompt com os novos dados
-- System prompt ja cobre alcool — nenhuma alteracao
+- `user_roles`: usuário vê suas próprias roles; INSERT para authenticated
+- `coach_athletes`: coach vê/insere suas relações; atleta vê suas relações (SELECT only)
+- `training_plans`: coach CRUD nos planos dos seus atletas; atleta SELECT only nos seus planos
+- Tabelas existentes (`daily_checks`, `workouts`, `body_composition`, `alcohol_intake`, `equipment`, `workout_evaluations`): adicionar policy SELECT para coaches dos atletas ativos via `is_coach_of()`
 
 ---
 
-### Parte 5: Arquivos a Criar/Modificar
+### Parte 2: Hook `useUserRole`
 
-| Arquivo | Acao |
-|---------|------|
-| `src/lib/alcoholCalcs.ts` | Adicionar funcoes de correlacao, padrao semanal e alertas |
-| `src/pages/AlcoholIntake.tsx` | Adicionar card de correlacao e alertas |
-| `src/pages/Today.tsx` | Adicionar card compacto de impacto do alcool |
-| `src/lib/triggers.ts` | Expandir tipo alcoholContext |
-| `src/lib/analysisData.ts` | Calcular e popular novos campos |
-| `supabase/functions/ai-coach/index.ts` | Aceitar novos campos no schema e prompt |
+Novo arquivo `src/hooks/useUserRole.tsx`:
+- Busca role do user em `user_roles`
+- Expõe: `role`, `isCoach`, `isAthlete`, `isLoading`, `setRole(newRole)`
+- Se user não tem role (novo user pós-migration), redireciona para `/select-role`
 
-### Nao Sera Alterado
-- CTL/ATL/TSB/TSS
-- Banco de dados (tudo calculado no frontend)
-- System prompt do ai-coach
-- Workout evaluator / Muscle integrity agent
+---
+
+### Parte 3: BottomNav — Emenda 2
+
+**`src/components/layout/BottomNav.tsx`:**
+
+```text
+if (isLoading || isAthlete || !role) → navegação padrão atual (6 itens atleta)
+if (isCoach && !isLoading) → navegação de coach (Dashboard, Atletas, Prescrever, Calendário, Config)
+```
+
+A BottomNav NUNCA fica em branco. O fallback é sempre a nav de atleta.
+
+---
+
+### Parte 4: Páginas Novas
+
+| Página | Path | Descrição |
+|--------|------|-----------|
+| `SelectRole.tsx` | `/select-role` | Onboarding: "Sou Coach" / "Sou Atleta" |
+| `CoachDashboard.tsx` | `/coach` | Lista de atletas com métricas resumidas |
+| `CoachAthleteProfile.tsx` | `/coach/athlete/:id` | Perfil detalhado do atleta (reutiliza componentes existentes) |
+| `PrescribeWorkout.tsx` | `/coach/prescribe` | Formulário de prescrição de treino |
+
+---
+
+### Parte 5: Hooks Novos
+
+| Hook | Descrição |
+|------|-----------|
+| `useUserRole` | Gerencia role do usuário |
+| `useCoachAthletes` | CRUD de relações coach-atleta |
+| `useTrainingPlans` | CRUD de planos de treino |
+
+---
+
+### Parte 6: Alterações em Arquivos Existentes
+
+| Arquivo | Alteração |
+|---------|-----------|
+| `BottomNav.tsx` | Nav condicional por role com fallback atleta (Emenda 2) |
+| `ProtectedRoute.tsx` | Prop opcional `requiredRole` |
+| `App.tsx` | Novas rotas (`/select-role`, `/coach`, `/coach/athlete/:id`, `/coach/prescribe`) |
+| `useData.tsx` | Função para buscar dados de outro usuário (para coach) |
+
+### Não Será Alterado
+
+- Lógica de CTL/ATL/TSB/TSS
+- Edge functions existentes
+- Estrutura das tabelas existentes (apenas novas RLS policies)
+- Fluxo de autenticação
+
+### Ordem de Implementação
+
+1. Migration SQL (tabelas + RLS + migração de usuários existentes)
+2. `useUserRole` + `SelectRole` + onboarding
+3. `BottomNav` condicional com salvaguarda
+4. `ProtectedRoute` com `requiredRole`
+5. Dashboard do coach + perfil do atleta
+6. Prescrição de treinos
+7. Feedback loop + alertas inteligentes
 
