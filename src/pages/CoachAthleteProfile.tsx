@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { MetricCard } from '@/components/ui/MetricCard';
-import { ArrowLeft, Loader2, Heart, Activity, TrendingUp, Moon } from 'lucide-react';
+import { ArrowLeft, Loader2, Heart, Activity, TrendingUp, Moon, CalendarDays } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useTrainingPlans, TrainingPlan } from '@/hooks/useTrainingPlans';
@@ -113,9 +113,14 @@ export default function CoachAthleteProfile() {
   return (
     <PageContainer title="Perfil do Atleta" subtitle={athleteLabel}>
       <div className="space-y-4 pb-20">
-        <Button variant="ghost" size="sm" onClick={() => navigate('/coach')}>
-          <ArrowLeft className="w-4 h-4 mr-1" /> Voltar
-        </Button>
+        <div className="flex items-center justify-between">
+          <Button variant="ghost" size="sm" onClick={() => navigate('/coach')}>
+            <ArrowLeft className="w-4 h-4 mr-1" /> Voltar
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => navigate(`/coach/athlete/${athleteId}/calendar`)}>
+            <CalendarDays className="w-4 h-4 mr-1" /> Calendário
+          </Button>
+        </div>
 
         {/* Athlete identity */}
         {athleteProfile.email && (
