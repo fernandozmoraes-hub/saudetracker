@@ -1,27 +1,44 @@
 
 
-## Plano: Aplicar Migration de Profiles
+## Plano: Implementar Calendário Semanal de Treinos para Coach
 
-### Acao
+### Situação
 
-Executar a migration SQL fornecida que cria:
+Os arquivos descritos pelo usuário não estão no projeto. Precisam ser criados/modificados diretamente.
 
-1. **Tabela `profiles`** com `user_id`, `display_name`, `email`, timestamps
-2. **RLS policies** para SELECT (authenticated), INSERT e UPDATE (own user)
-3. **Trigger `handle_new_user`** em `auth.users` para criacao automatica de perfil
-4. **Populacao** de perfis para usuarios existentes
-5. **Indice** em `profiles.email`
+### Arquivos a criar
 
-### Nota Tecnica Importante
+**1. `src/components/coach/CoachCalendarDay.tsx`**
 
-A migration inclui um trigger em `auth.users`. Embora tabelas do schema `auth` sejam reservadas, este pattern especifico (trigger AFTER INSERT para criar perfil) e suportado e recomendado. Sera executado via migration tool.
+Componente que exibe um dia no calendário do coach com:
+- Treino planejado (da tabela `training_plans`): tipo, duração, zona, TSS, notas
+- Status visual com cores: Concluído (verde), Planejado (azul), Não feito (laranja), Pulado (vermelho)
+- Treino realizado (da tabela `workouts`): TSS real, duração, RPE
+- Badge "Extra" quando há treino sem plano correspondente
 
-### Execucao
+**2. `src/pages/CoachAthleteCalendar.tsx`**
 
-| Passo | Acao |
-|-------|------|
-| 1 | Executar migration SQL completa via ferramenta de migracao |
-| 2 | Verificar que a tabela `profiles` foi criada com RLS ativo |
+Página de calendário semanal com:
+- Navegação por semanas (anterior/próxima/hoje) usando `subWeeks`/`addWeeks`
+- Resumo semanal: contagem de planejados, concluídos, pulados, extras + barra TSS planejado vs realizado
+- Grid de 7 dias usando `eachDayOfInterval(startOfWeek, endOfWeek)` com locale `ptBR`
+- Dados via `useTrainingPlans(athleteId)` + fetch de workouts do atleta
+- Reutiliza `PageContainer` para layout
 
-Nenhuma alteracao de codigo necessaria (ja feito via GitHub).
+### Arquivos a modificar
+
+**3. `src/App.tsx`**
+- Import `CoachAthleteCalendar`
+- Adicionar rota: `<Route path="/coach/athlete/:id/calendar" element={<ProtectedRoute requiredRole="coach"><CoachAthleteCalendar /></ProtectedRoute>} />`
+
+**4. `src/pages/CoachAthleteProfile.tsx`**
+- Adicionar botão "Calendário" ao lado do botão "Voltar" que navega para `/coach/athlete/${athleteId}/calendar`
+
+### Dependências utilizadas (já disponíveis)
+- `date-fns`: `startOfWeek`, `endOfWeek`, `eachDayOfInterval`, `addWeeks`, `subWeeks`, `format`, `isToday`
+- `date-fns/locale/ptBR`
+- `useTrainingPlans` hook existente
+- `supabase` client para fetch de workouts
+
+### Sem alterações no banco de dados
 
