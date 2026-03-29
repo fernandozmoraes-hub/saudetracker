@@ -56,7 +56,10 @@ export function UserRoleProvider({ children }: { children: ReactNode }) {
 
     const { error } = await supabase
       .from('user_roles')
-      .insert({ user_id: user.id, role: newRole } as any);
+      .upsert(
+        { user_id: user.id, role: newRole },
+        { onConflict: 'user_id,role', ignoreDuplicates: true }
+      );
 
     if (error) {
       console.error('Error setting role:', error);
