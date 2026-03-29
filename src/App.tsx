@@ -27,6 +27,7 @@ import ResetPassword from "./pages/ResetPassword";
 import SelectRole from "./pages/SelectRole";
 import CoachDashboard from "./pages/CoachDashboard";
 import CoachAthleteProfile from "./pages/CoachAthleteProfile";
+import CoachAthleteCalendar from "./pages/CoachAthleteCalendar";
 import PrescribeWorkout from "./pages/PrescribeWorkout";
 import NotFound from "./pages/NotFound";
 
@@ -63,6 +64,7 @@ const App = () => (
                       {/* Coach routes */}
                       <Route path="/coach" element={<ProtectedRoute requiredRole="coach"><CoachDashboard /></ProtectedRoute>} />
                       <Route path="/coach/athlete/:id" element={<ProtectedRoute requiredRole="coach"><CoachAthleteProfile /></ProtectedRoute>} />
+                      <Route path="/coach/athlete/:id/calendar" element={<ProtectedRoute requiredRole="coach"><CoachAthleteCalendar /></ProtectedRoute>} />
                       <Route path="/coach/prescribe" element={<ProtectedRoute requiredRole="coach"><PrescribeWorkout /></ProtectedRoute>} />
                       <Route path="*" element={<NotFound />} />
                     </Routes>
