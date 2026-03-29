@@ -40,7 +40,7 @@ export default function PrescribeWorkout() {
     }
 
     setSaving(true);
-    const success = await createPlan({
+    const err = await createPlan({
       coach_id: user.id,
       athlete_id: form.athlete_id,
       date: form.date,
@@ -53,13 +53,19 @@ export default function PrescribeWorkout() {
       workout_id: null,
     });
 
-    if (success) {
+    if (err) {
+      toast.error(err);
+    } else {
       toast.success('Treino prescrito com sucesso!');
       navigate(-1);
-    } else {
-      toast.error('Erro ao prescrever treino.');
     }
     setSaving(false);
+  };
+
+  const getAthleteLabel = (athleteId: string) => {
+    const athlete = activeAthletes.find((a) => a.athlete_id === athleteId);
+    if (!athlete) return athleteId.slice(0, 8) + '...';
+    return athlete.athlete_name ?? athlete.athlete_email ?? athleteId.slice(0, 8) + '...';
   };
 
   return (
@@ -72,14 +78,19 @@ export default function PrescribeWorkout() {
           <CardContent className="space-y-4">
             <div>
               <Label>Atleta *</Label>
-              <Select value={form.athlete_id} onValueChange={(v) => setForm(f => ({ ...f, athlete_id: v }))}>
+              <Select
+                value={form.athlete_id}
+                onValueChange={(v) => setForm((f) => ({ ...f, athlete_id: v }))}
+              >
                 <SelectTrigger>
-                  <SelectValue placeholder="Selecionar atleta" />
+                  <SelectValue placeholder="Selecionar atleta">
+                    {form.athlete_id ? getAthleteLabel(form.athlete_id) : 'Selecionar atleta'}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {activeAthletes.map((a) => (
                     <SelectItem key={a.athlete_id} value={a.athlete_id}>
-                      {a.athlete_id.slice(0, 8)}...
+                      {a.athlete_name ?? a.athlete_email ?? a.athlete_id.slice(0, 8) + '...'}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -91,13 +102,16 @@ export default function PrescribeWorkout() {
               <Input
                 type="date"
                 value={form.date}
-                onChange={(e) => setForm(f => ({ ...f, date: e.target.value }))}
+                onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))}
               />
             </div>
 
             <div>
               <Label>Tipo *</Label>
-              <Select value={form.type} onValueChange={(v) => setForm(f => ({ ...f, type: v }))}>
+              <Select
+                value={form.type}
+                onValueChange={(v) => setForm((f) => ({ ...f, type: v }))}
+              >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -115,14 +129,17 @@ export default function PrescribeWorkout() {
               <Input
                 type="number"
                 value={form.planned_duration_min}
-                onChange={(e) => setForm(f => ({ ...f, planned_duration_min: e.target.value }))}
+                onChange={(e) => setForm((f) => ({ ...f, planned_duration_min: e.target.value }))}
                 placeholder="Ex: 60"
               />
             </div>
 
             <div>
               <Label>Zona Alvo</Label>
-              <Select value={form.planned_zone} onValueChange={(v) => setForm(f => ({ ...f, planned_zone: v }))}>
+              <Select
+                value={form.planned_zone}
+                onValueChange={(v) => setForm((f) => ({ ...f, planned_zone: v }))}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Opcional" />
                 </SelectTrigger>
@@ -141,7 +158,7 @@ export default function PrescribeWorkout() {
               <Input
                 type="number"
                 value={form.planned_tss}
-                onChange={(e) => setForm(f => ({ ...f, planned_tss: e.target.value }))}
+                onChange={(e) => setForm((f) => ({ ...f, planned_tss: e.target.value }))}
                 placeholder="Ex: 80"
               />
             </div>
@@ -150,7 +167,7 @@ export default function PrescribeWorkout() {
               <Label>Observações</Label>
               <Textarea
                 value={form.notes}
-                onChange={(e) => setForm(f => ({ ...f, notes: e.target.value }))}
+                onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
                 placeholder="Instruções, foco do treino, etc."
               />
             </div>

@@ -10,11 +10,17 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useTrainingPlans, TrainingPlan } from '@/hooks/useTrainingPlans';
 import { format, subDays } from 'date-fns';
+import { toast } from 'sonner';
 
 interface AthleteData {
   dailyChecks: any[];
   workouts: any[];
   latestCheck: any | null;
+}
+
+interface AthleteProfile {
+  display_name?: string;
+  email?: string;
 }
 
 export default function CoachAthleteProfile() {
@@ -23,6 +29,7 @@ export default function CoachAthleteProfile() {
   const { user } = useAuth();
   const { plans } = useTrainingPlans(athleteId);
   const [data, setData] = useState<AthleteData>({ dailyChecks: [], workouts: [], latestCheck: null });
+  const [athleteProfile, setAthleteProfile] = useState<AthleteProfile>({});
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -33,7 +40,7 @@ export default function CoachAthleteProfile() {
       try {
         const last30 = format(subDays(new Date(), 30), 'yyyy-MM-dd');
 
-        const [checksRes, workoutsRes] = await Promise.all([
+        const [checksRes, workoutsRes, profileRes] = await Promise.all([
           supabase
             .from('daily_checks')
             .select('*')
@@ -46,8 +53,17 @@ export default function CoachAthleteProfile() {
             .eq('user_id', athleteId)
             .gte('date', last30)
             .order('date', { ascending: false }),
+          supabase
+            .from('profiles')
+            .select('display_name, email')
+            .eq('user_id', athleteId)
+            .maybeSingle(),
         ]);
 
+        if (checksRes.error) throw checksRes.error;
+        if (workoutsRes.error) throw workoutsRes.error;
+
+        setAthleteProfile((profileRes.data as AthleteProfile) ?? {});
         setData({
           dailyChecks: checksRes.data || [],
           workouts: workoutsRes.data || [],
@@ -55,6 +71,7 @@ export default function CoachAthleteProfile() {
         });
       } catch (err) {
         console.error('Error fetching athlete data:', err);
+        toast.error('Erro ao carregar dados do atleta. Tente novamente.');
       } finally {
         setIsLoading(false);
       }
@@ -73,9 +90,17 @@ export default function CoachAthleteProfile() {
 
   const { latestCheck, workouts, dailyChecks } = data;
 
+  const athleteLabel =
+    athleteProfile.display_name ??
+    athleteProfile.email ??
+    (athleteId?.slice(0, 8) + '...');
+
   // Calculate HRV baseline (7-day average)
-  const recentHrvs = dailyChecks.slice(0, 7).map(c => c.hrv).filter(Boolean);
-  const hrvBaseline = recentHrvs.length > 0 ? Math.round(recentHrvs.reduce((a: number, b: number) => a + b, 0) / recentHrvs.length) : null;
+  const recentHrvs = dailyChecks.slice(0, 7).map((c) => c.hrv).filter(Boolean);
+  const hrvBaseline =
+    recentHrvs.length > 0
+      ? Math.round(recentHrvs.reduce((a: number, b: number) => a + b, 0) / recentHrvs.length)
+      : null;
 
   // Weekly TSS
   const last7Days = format(subDays(new Date(), 7), 'yyyy-MM-dd');
@@ -83,18 +108,21 @@ export default function CoachAthleteProfile() {
     .filter((w: any) => w.date >= last7Days)
     .reduce((sum: number, w: any) => sum + (Number(w.tss_final) || Number(w.tss_subjective) || 0), 0);
 
-  // Recent plans
   const recentPlans = plans.slice(0, 5);
 
   return (
-    <PageContainer
-      title="Perfil do Atleta"
-      subtitle={athleteId?.slice(0, 8) + '...'}
-    >
+    <PageContainer title="Perfil do Atleta" subtitle={athleteLabel}>
       <div className="space-y-4 pb-20">
         <Button variant="ghost" size="sm" onClick={() => navigate('/coach')}>
           <ArrowLeft className="w-4 h-4 mr-1" /> Voltar
         </Button>
+
+        {/* Athlete identity */}
+        {athleteProfile.email && (
+          <div className="px-1">
+            <p className="text-sm text-muted-foreground">{athleteProfile.email}</p>
+          </div>
+        )}
 
         {/* Metrics Overview */}
         <div className="grid grid-cols-2 gap-3">
@@ -131,15 +159,22 @@ export default function CoachAthleteProfile() {
             </CardHeader>
             <CardContent className="space-y-2">
               {hrvBaseline && latestCheck.hrv < hrvBaseline * 0.85 && (
-                <Badge variant="destructive">HRV em declínio ({Math.round(((latestCheck.hrv - hrvBaseline) / hrvBaseline) * 100)}%)</Badge>
+                <Badge variant="destructive">
+                  HRV em declínio ({Math.round(((latestCheck.hrv - hrvBaseline) / hrvBaseline) * 100)}%)
+                </Badge>
               )}
               {latestCheck.sleep_hours && Number(latestCheck.sleep_hours) < 6 && (
-                <Badge variant="destructive">Privação de sono ({Number(latestCheck.sleep_hours).toFixed(1)}h)</Badge>
+                <Badge variant="destructive">
+                  Privação de sono ({Number(latestCheck.sleep_hours).toFixed(1)}h)
+                </Badge>
               )}
               {latestCheck.alcohol_yesterday && (
                 <Badge variant="secondary">Consumo de álcool ontem</Badge>
               )}
-              {!hrvBaseline || (latestCheck.hrv >= hrvBaseline * 0.85 && Number(latestCheck.sleep_hours || 8) >= 6 && !latestCheck.alcohol_yesterday) ? (
+              {!hrvBaseline ||
+              (latestCheck.hrv >= hrvBaseline * 0.85 &&
+                Number(latestCheck.sleep_hours || 8) >= 6 &&
+                !latestCheck.alcohol_yesterday) ? (
                 <p className="text-sm text-muted-foreground">Sem alertas ativos ✅</p>
               ) : null}
             </CardContent>
@@ -161,15 +196,29 @@ export default function CoachAthleteProfile() {
               recentPlans.map((plan: TrainingPlan) => (
                 <div key={plan.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
                   <div>
-                    <p className="text-sm font-medium text-foreground">{plan.date} — {plan.type}</p>
+                    <p className="text-sm font-medium text-foreground">
+                      {plan.date} — {plan.type}
+                    </p>
                     <p className="text-xs text-muted-foreground">
                       {plan.planned_duration_min}min
                       {plan.planned_zone ? ` • Z${plan.planned_zone}` : ''}
                       {plan.planned_tss ? ` • TSS ${plan.planned_tss}` : ''}
                     </p>
                   </div>
-                  <Badge variant={plan.status === 'completed' ? 'default' : plan.status === 'skipped' ? 'destructive' : 'secondary'}>
-                    {plan.status === 'planned' ? 'Planejado' : plan.status === 'completed' ? 'Concluído' : 'Pulado'}
+                  <Badge
+                    variant={
+                      plan.status === 'completed'
+                        ? 'default'
+                        : plan.status === 'skipped'
+                        ? 'destructive'
+                        : 'secondary'
+                    }
+                  >
+                    {plan.status === 'planned'
+                      ? 'Planejado'
+                      : plan.status === 'completed'
+                      ? 'Concluído'
+                      : 'Pulado'}
                   </Badge>
                 </div>
               ))
@@ -186,7 +235,9 @@ export default function CoachAthleteProfile() {
             {workouts.slice(0, 5).map((w: any) => (
               <div key={w.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
                 <div>
-                  <p className="text-sm font-medium text-foreground">{w.date} — {w.type}</p>
+                  <p className="text-sm font-medium text-foreground">
+                    {w.date} — {w.type}
+                  </p>
                   <p className="text-xs text-muted-foreground">
                     {w.duration_min}min • RPE {w.rpe} • TSS {Number(w.tss_final || w.tss_subjective)}
                   </p>

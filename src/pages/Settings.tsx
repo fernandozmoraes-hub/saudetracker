@@ -7,16 +7,33 @@ import { Label } from '@/components/ui/label';
 import { useUserSettings } from '@/hooks/useUserSettings';
 import { useStravaConnection } from '@/hooks/useStravaConnection';
 import { useToast } from '@/hooks/use-toast';
-import { Heart, Save, Info, Loader2, Activity, Dumbbell, Zap, Link2, Unlink, CheckCircle2, Footprints, ChevronRight, Scale, Wine } from 'lucide-react';
+import { Heart, Save, Info, Loader2, Activity, Dumbbell, Zap, Link2, Unlink, CheckCircle2, Footprints, ChevronRight, Scale, Wine, UserCheck } from 'lucide-react';
 import { DEFAULT_LTHR, DEFAULT_ZONE_THRESHOLDS, getHrZones, ZONE_WEIGHTS } from '@/lib/calculations';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Link } from 'react-router-dom';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { usePendingInvites } from '@/hooks/usePendingInvites';
+import { toast as sonnerToast } from 'sonner';
 
 export default function Settings() {
   const { toast } = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
   const { settings, isLoading, updateSettings } = useUserSettings();
   const { connection, isLoading: isLoadingStrava, isConnecting, isConnected, connect, disconnect, handleCallback, handleOAuthCallback } = useStravaConnection();
+  const { invites, acceptInvite, rejectInvite } = usePendingInvites();
+
+  const handleAcceptInvite = async (id: string) => {
+    const err = await acceptInvite(id);
+    if (err) sonnerToast.error(err);
+    else sonnerToast.success('Convite aceito! Você agora está vinculado ao coach.');
+  };
+
+  const handleRejectInvite = async (id: string) => {
+    const err = await rejectInvite(id);
+    if (err) sonnerToast.error(err);
+    else sonnerToast.info('Convite recusado.');
+  };
   const [lthr, setLthr] = useState<number>(DEFAULT_LTHR);
   const [restingHr, setRestingHr] = useState<number | undefined>();
   const [maxHr, setMaxHr] = useState<number | undefined>();
@@ -185,6 +202,42 @@ export default function Settings() {
       title="Configurações" 
       subtitle="Personalize seus parâmetros de treino"
     >
+      {/* Convites Pendentes de Coach */}
+      {invites.length > 0 && (
+        <Card className="border-primary/40">
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <UserCheck className="w-4 h-4 text-primary" />
+              Convites de Coach
+              <Badge variant="default" className="ml-auto">{invites.length}</Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {invites.map((invite) => (
+              <div key={invite.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg gap-3">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-foreground truncate">
+                    {invite.coach_name ?? invite.coach_email ?? 'Coach'}
+                  </p>
+                  {invite.coach_email && invite.coach_name && (
+                    <p className="text-xs text-muted-foreground truncate">{invite.coach_email}</p>
+                  )}
+                  <p className="text-xs text-muted-foreground">quer te acompanhar como atleta</p>
+                </div>
+                <div className="flex gap-2 shrink-0">
+                  <Button size="sm" onClick={() => handleAcceptInvite(invite.id)}>
+                    Aceitar
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => handleRejectInvite(invite.id)}>
+                    Recusar
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
       {/* Parâmetros Fisiológicos */}
       <div className="gradient-card rounded-xl p-6 border border-border/50 space-y-4 animate-slide-up">
         <div className="flex items-center gap-3">
