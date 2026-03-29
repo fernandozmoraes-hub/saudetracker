@@ -1,42 +1,27 @@
 
 
-## Plano: Corrigir erro ao definir perfil
+## Plano: Aplicar Migration de Profiles
 
-### Diagnóstico
+### Acao
 
-O usuário já possui **duas** roles no banco (`athlete` e `coach`). Quando tenta selecionar uma role na tela `/select-role`, o INSERT falha por violação da constraint `UNIQUE (user_id, role)`.
+Executar a migration SQL fornecida que cria:
 
-O hook `useUserRole` usa `.insert()` sem tratar conflitos.
+1. **Tabela `profiles`** com `user_id`, `display_name`, `email`, timestamps
+2. **RLS policies** para SELECT (authenticated), INSERT e UPDATE (own user)
+3. **Trigger `handle_new_user`** em `auth.users` para criacao automatica de perfil
+4. **Populacao** de perfis para usuarios existentes
+5. **Indice** em `profiles.email`
 
-### Correção
+### Nota Tecnica Importante
 
-**Arquivo: `src/hooks/useUserRole.tsx`**
+A migration inclui um trigger em `auth.users`. Embora tabelas do schema `auth` sejam reservadas, este pattern especifico (trigger AFTER INSERT para criar perfil) e suportado e recomendado. Sera executado via migration tool.
 
-Alterar a função `setRole` para usar `.upsert()` com `onConflict: 'user_id, role'` em vez de `.insert()`. Isso resolve o conflito quando o usuário já possui a role.
+### Execucao
 
-```typescript
-const { error } = await supabase
-  .from('user_roles')
-  .upsert(
-    { user_id: user.id, role: newRole },
-    { onConflict: 'user_id,role' }
-  );
-```
+| Passo | Acao |
+|-------|------|
+| 1 | Executar migration SQL completa via ferramenta de migracao |
+| 2 | Verificar que a tabela `profiles` foi criada com RLS ativo |
 
-Adicionalmente, precisa de uma RLS policy de UPDATE na tabela `user_roles` (atualmente ausente), ou usar `ignoreDuplicates: true` no upsert para simplesmente ignorar se já existe:
-
-```typescript
-const { error } = await supabase
-  .from('user_roles')
-  .upsert(
-    { user_id: user.id, role: newRole },
-    { onConflict: 'user_id,role', ignoreDuplicates: true }
-  );
-```
-
-### Arquivos alterados
-
-| Arquivo | Alteração |
-|---------|-----------|
-| `src/hooks/useUserRole.tsx` | Trocar `.insert()` por `.upsert()` com `ignoreDuplicates: true` |
+Nenhuma alteracao de codigo necessaria (ja feito via GitHub).
 
