@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { useCoachAthletes } from '@/hooks/useCoachAthletes';
+import { useCoachCompliance } from '@/hooks/useCoachCompliance';
+import { ComplianceBadge } from '@/components/coach/ComplianceBadge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,11 +13,12 @@ import { toast } from 'sonner';
 
 export default function CoachDashboard() {
   const { activeAthletes, pendingAthletes, isLoading, error, inviteAthlete, updateStatus, removeAthlete } = useCoachAthletes();
+  const { getAthleteCompliance, isLoading: complianceLoading } = useCoachCompliance();
   const navigate = useNavigate();
   const [inviteEmail, setInviteEmail] = useState('');
   const [isInviting, setIsInviting] = useState(false);
 
-  if (isLoading) {
+  if (isLoading || complianceLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
@@ -132,28 +135,32 @@ export default function CoachDashboard() {
               </CardContent>
             </Card>
           ) : (
-            activeAthletes.map((athlete) => (
-              <Card
-                key={athlete.id}
-                className="cursor-pointer hover:border-primary/50 transition-colors"
-                onClick={() => navigate(`/coach/athlete/${athlete.athlete_id}`)}
-              >
-                <CardContent className="flex items-center justify-between p-4">
-                  <div>
-                    <p className="font-medium text-foreground">
-                      {athlete.athlete_name ?? athlete.athlete_email ?? athlete.athlete_id.slice(0, 8) + '...'}
-                    </p>
-                    {athlete.athlete_email && (
-                      <p className="text-xs text-muted-foreground mt-0.5">{athlete.athlete_email}</p>
-                    )}
-                    <div className="flex gap-2 mt-1">
-                      <Badge variant="secondary" className="text-xs">Ativo</Badge>
+            activeAthletes.map((athlete) => {
+              const compliance = getAthleteCompliance(athlete.athlete_id);
+              return (
+                <Card
+                  key={athlete.id}
+                  className="cursor-pointer hover:border-primary/50 transition-colors"
+                  onClick={() => navigate(`/coach/athlete/${athlete.athlete_id}`)}
+                >
+                  <CardContent className="flex items-center justify-between p-4">
+                    <div className="space-y-1 min-w-0">
+                      <p className="font-medium text-foreground truncate">
+                        {athlete.athlete_name ?? athlete.athlete_email ?? athlete.athlete_id.slice(0, 8) + '...'}
+                      </p>
+                      {athlete.athlete_email && (
+                        <p className="text-xs text-muted-foreground truncate">{athlete.athlete_email}</p>
+                      )}
+                      <div className="flex flex-wrap items-center gap-2 pt-0.5">
+                        <Badge variant="secondary" className="text-xs">Ativo</Badge>
+                        <ComplianceBadge stats={compliance} variant="compact" />
+                      </div>
                     </div>
-                  </div>
-                  <ChevronRight className="w-5 h-5 text-muted-foreground" />
-                </CardContent>
-              </Card>
-            ))
+                    <ChevronRight className="w-5 h-5 text-muted-foreground shrink-0 ml-2" />
+                  </CardContent>
+                </Card>
+              );
+            })
           )}
         </div>
       </div>

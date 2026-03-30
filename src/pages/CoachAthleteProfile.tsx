@@ -9,6 +9,8 @@ import { ArrowLeft, Loader2, Heart, Activity, TrendingUp, Moon, CalendarDays } f
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useTrainingPlans, TrainingPlan } from '@/hooks/useTrainingPlans';
+import { computeCompliance } from '@/hooks/useCoachCompliance';
+import { ComplianceBadge } from '@/components/coach/ComplianceBadge';
 import { format, subDays } from 'date-fns';
 import { toast } from 'sonner';
 
@@ -109,6 +111,7 @@ export default function CoachAthleteProfile() {
     .reduce((sum: number, w: any) => sum + (Number(w.tss_final) || Number(w.tss_subjective) || 0), 0);
 
   const recentPlans = plans.slice(0, 5);
+  const compliance = computeCompliance(plans);
 
   return (
     <PageContainer title="Perfil do Atleta" subtitle={athleteLabel}>
@@ -185,6 +188,16 @@ export default function CoachAthleteProfile() {
             </CardContent>
           </Card>
         )}
+
+        {/* Compliance */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Adesão ao Plano — Últimos 30 dias</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ComplianceBadge stats={compliance} variant="full" />
+          </CardContent>
+        </Card>
 
         {/* Training Plans */}
         <Card>
