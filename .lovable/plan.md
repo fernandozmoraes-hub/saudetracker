@@ -1,19 +1,26 @@
 
 
-## Plano: Aplicar Migrations de Workout Feedback e Messages
+## Plano: Corrigir validação do AI Coach Edge Function
 
-### Ação
+### Diagnóstico
 
-Executar uma migration SQL única contendo:
+Os logs mostram repetidamente: `fieldErrors: { analysisData: [ "Number must be greater than or equal to 20" ] }`. O campo `restingHr` no `TodayDataSchema` exige `.min(20)`, mas o valor enviado está abaixo de 20 (provavelmente 0 quando não preenchido).
 
-1. **Tabela `workout_feedback`** — feedback do coach em treinos do atleta, com RLS para coach (ALL) e atleta (SELECT), índices em `workout_id` e `athlete_id`
-2. **Tabela `messages`** — mensagens entre coach e atleta, com RLS para visualização, envio e marcação de leitura, índice composto em `(coach_id, athlete_id, created_at DESC)`
+### Correção
 
-### Execução
+**Arquivo: `supabase/functions/ai-coach/index.ts`**
 
-| Passo | Ação |
-|-------|------|
-| 1 | Executar migration SQL completa via ferramenta de migração |
+Alterar o `TodayDataSchema` para aceitar `restingHr` a partir de 0:
 
-Nenhuma alteração de código necessária (já feito via GitHub).
+```typescript
+restingHr: z.number().min(0).max(250),
+```
+
+Isso permite que o sistema funcione mesmo quando o usuário não preencheu a FC de repouso (valor 0), sem quebrar a validação. O valor 0 será tratado como "não informado" na análise.
+
+### Arquivos alterados
+
+| Arquivo | Alteração |
+|---------|-----------|
+| `supabase/functions/ai-coach/index.ts` | `restingHr` min de 20 → 0 |
 
