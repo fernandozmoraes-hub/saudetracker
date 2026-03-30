@@ -8,9 +8,12 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Users, UserPlus, ChevronRight, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { useCoachCompliance } from '@/hooks/useCoachCompliance';
+import { ComplianceBadge } from '@/components/coach/ComplianceBadge';
 
 export default function CoachDashboard() {
   const { activeAthletes, pendingAthletes, isLoading, updateStatus, removeAthlete } = useCoachAthletes();
+  const { complianceMap } = useCoachCompliance();
   const navigate = useNavigate();
   const [inviteEmail, setInviteEmail] = useState('');
 
@@ -102,8 +105,9 @@ export default function CoachDashboard() {
                 <CardContent className="flex items-center justify-between p-4">
                   <div>
                     <p className="font-medium text-foreground">{athlete.athlete_id.slice(0, 8)}...</p>
-                    <div className="flex gap-2 mt-1">
+                    <div className="flex items-center gap-2 mt-1">
                       <Badge variant="secondary" className="text-xs">Ativo</Badge>
+                      <ComplianceBadge variant="compact" stats={complianceMap.get(athlete.athlete_id)} />
                     </div>
                   </div>
                   <ChevronRight className="w-5 h-5 text-muted-foreground" />

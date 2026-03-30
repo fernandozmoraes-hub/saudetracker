@@ -9,6 +9,8 @@ import { ArrowLeft, Loader2, Heart, Activity, TrendingUp, Moon, CalendarDays } f
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useTrainingPlans, TrainingPlan } from '@/hooks/useTrainingPlans';
+import { computeCompliance } from '@/hooks/useCoachCompliance';
+import { ComplianceBadge } from '@/components/coach/ComplianceBadge';
 import { format, subDays } from 'date-fns';
 
 interface AthleteData {
@@ -127,6 +129,9 @@ export default function CoachAthleteProfile() {
             unit={latestCheck?.sleep_quality ? `Qualidade: ${latestCheck.sleep_quality}/5` : undefined}
           />
         </div>
+
+        {/* Compliance */}
+        <ComplianceBadge variant="full" stats={computeCompliance(plans)} />
 
         {/* Alerts */}
         {latestCheck && (
