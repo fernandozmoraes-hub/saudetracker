@@ -212,6 +212,36 @@ export type Database = {
         }
         Relationships: []
       }
+      messages: {
+        Row: {
+          athlete_id: string
+          coach_id: string
+          content: string
+          created_at: string
+          id: string
+          read_at: string | null
+          sender_id: string
+        }
+        Insert: {
+          athlete_id: string
+          coach_id: string
+          content: string
+          created_at?: string
+          id?: string
+          read_at?: string | null
+          sender_id: string
+        }
+        Update: {
+          athlete_id?: string
+          coach_id?: string
+          content?: string
+          created_at?: string
+          id?: string
+          read_at?: string | null
+          sender_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
@@ -440,6 +470,41 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "workout_evaluations_workout_id_fkey"
+            columns: ["workout_id"]
+            isOneToOne: false
+            referencedRelation: "workouts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      workout_feedback: {
+        Row: {
+          athlete_id: string
+          coach_id: string
+          created_at: string
+          id: string
+          text: string
+          workout_id: string
+        }
+        Insert: {
+          athlete_id: string
+          coach_id: string
+          created_at?: string
+          id?: string
+          text: string
+          workout_id: string
+        }
+        Update: {
+          athlete_id?: string
+          coach_id?: string
+          created_at?: string
+          id?: string
+          text?: string
+          workout_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workout_feedback_workout_id_fkey"
             columns: ["workout_id"]
             isOneToOne: false
             referencedRelation: "workouts"
