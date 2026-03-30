@@ -5,14 +5,17 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { MetricCard } from '@/components/ui/MetricCard';
-import { ArrowLeft, Loader2, Heart, Activity, TrendingUp, Moon, CalendarDays } from 'lucide-react';
+import { ArrowLeft, Loader2, Heart, Activity, TrendingUp as TrendingUpIcon, Moon, CalendarDays } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useTrainingPlans, TrainingPlan } from '@/hooks/useTrainingPlans';
 import { computeCompliance } from '@/hooks/useCoachCompliance';
 import { ComplianceBadge } from '@/components/coach/ComplianceBadge';
+import { useWorkoutFeedback } from '@/hooks/useWorkoutFeedback';
 import { format, subDays } from 'date-fns';
 import { toast } from 'sonner';
+import { Textarea } from '@/components/ui/textarea';
+import { MessageCircle, TrendingUp, Send, ChevronDown, ChevronUp } from 'lucide-react';
 
 interface AthleteData {
   dailyChecks: any[];
@@ -30,6 +33,10 @@ export default function CoachAthleteProfile() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { plans } = useTrainingPlans(athleteId);
+  const { feedbackByWorkout, addFeedback } = useWorkoutFeedback(athleteId);
+  const [expandedWorkout, setExpandedWorkout] = useState<string | null>(null);
+  const [feedbackTexts, setFeedbackTexts] = useState<Record<string, string>>({});
+  const [sendingFeedback, setSendingFeedback] = useState<string | null>(null);
   const [data, setData] = useState<AthleteData>({ dailyChecks: [], workouts: [], latestCheck: null });
   const [athleteProfile, setAthleteProfile] = useState<AthleteProfile>({});
   const [isLoading, setIsLoading] = useState(true);
@@ -113,16 +120,34 @@ export default function CoachAthleteProfile() {
   const recentPlans = plans.slice(0, 5);
   const compliance = computeCompliance(plans);
 
+  const handleSendFeedback = async (workoutId: string) => {
+    const text = feedbackTexts[workoutId] ?? '';
+    setSendingFeedback(workoutId);
+    const err = await addFeedback(workoutId, text);
+    setSendingFeedback(null);
+    if (err) { toast.error(err); return; }
+    setFeedbackTexts((prev) => ({ ...prev, [workoutId]: '' }));
+    toast.success('Feedback enviado!');
+  };
+
   return (
     <PageContainer title="Perfil do Atleta" subtitle={athleteLabel}>
       <div className="space-y-4 pb-20">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
           <Button variant="ghost" size="sm" onClick={() => navigate('/coach')}>
             <ArrowLeft className="w-4 h-4 mr-1" /> Voltar
           </Button>
-          <Button variant="outline" size="sm" onClick={() => navigate(`/coach/athlete/${athleteId}/calendar`)}>
-            <CalendarDays className="w-4 h-4 mr-1" /> Calendário
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={() => navigate(`/coach/athlete/${athleteId}/trends`)}>
+              <TrendingUp className="w-4 h-4 mr-1" /> Tendências
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => navigate(`/coach/athlete/${athleteId}/calendar`)}>
+              <CalendarDays className="w-4 h-4 mr-1" /> Calendário
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => navigate(`/coach/athlete/${athleteId}/chat`)}>
+              <MessageCircle className="w-4 h-4 mr-1" /> Chat
+            </Button>
+          </div>
         </div>
 
         {/* Athlete identity */}
@@ -149,7 +174,7 @@ export default function CoachAthleteProfile() {
           <MetricCard
             label="TSS Semanal"
             value={Math.round(weeklyTSS)}
-            icon={<TrendingUp className="w-4 h-4" />}
+            icon={<TrendingUpIcon className="w-4 h-4" />}
           />
           <MetricCard
             label="Sono"
@@ -244,24 +269,74 @@ export default function CoachAthleteProfile() {
           </CardContent>
         </Card>
 
-        {/* Recent Workouts */}
+        {/* Recent Workouts + Feedback */}
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Treinos Recentes</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-2">
-            {workouts.slice(0, 5).map((w: any) => (
-              <div key={w.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
-                <div>
-                  <p className="text-sm font-medium text-foreground">
-                    {w.date} — {w.type}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {w.duration_min}min • RPE {w.rpe} • TSS {Number(w.tss_final || w.tss_subjective)}
-                  </p>
+          <CardContent className="space-y-3">
+            {workouts.slice(0, 5).map((w: any) => {
+              const wFeedbacks = feedbackByWorkout.get(w.id) ?? [];
+              const isExpanded = expandedWorkout === w.id;
+              return (
+                <div key={w.id} className="rounded-lg border border-border overflow-hidden">
+                  <div
+                    className="flex items-center justify-between p-3 bg-muted/30 cursor-pointer hover:bg-muted/50 transition-colors"
+                    onClick={() => setExpandedWorkout(isExpanded ? null : w.id)}
+                  >
+                    <div>
+                      <p className="text-sm font-medium text-foreground">{w.date} — {w.type}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {w.duration_min}min • RPE {w.rpe} • TSS {Number(w.tss_final || w.tss_subjective)}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {wFeedbacks.length > 0 && (
+                        <span className="text-xs text-primary font-medium">{wFeedbacks.length} nota{wFeedbacks.length > 1 ? 's' : ''}</span>
+                      )}
+                      {isExpanded
+                        ? <ChevronUp className="w-4 h-4 text-muted-foreground" />
+                        : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
+                    </div>
+                  </div>
+
+                  {isExpanded && (
+                    <div className="p-3 space-y-3 border-t border-border">
+                      {wFeedbacks.length > 0 && (
+                        <div className="space-y-2">
+                          {wFeedbacks.map((fb) => (
+                            <div key={fb.id} className="bg-primary/5 border border-primary/20 rounded-lg px-3 py-2">
+                              <p className="text-sm text-foreground">{fb.text}</p>
+                              <p className="text-xs text-muted-foreground mt-1">
+                                {new Date(fb.created_at).toLocaleDateString('pt-BR')}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      <div className="flex gap-2">
+                        <Textarea
+                          placeholder="Escreva um feedback para este treino..."
+                          className="min-h-0 h-16 text-sm resize-none"
+                          value={feedbackTexts[w.id] ?? ''}
+                          onChange={(e) => setFeedbackTexts((prev) => ({ ...prev, [w.id]: e.target.value }))}
+                        />
+                        <Button
+                          size="icon"
+                          className="h-16 w-10 shrink-0"
+                          disabled={sendingFeedback === w.id || !(feedbackTexts[w.id] ?? '').trim()}
+                          onClick={() => handleSendFeedback(w.id)}
+                        >
+                          {sendingFeedback === w.id
+                            ? <Loader2 className="w-4 h-4 animate-spin" />
+                            : <Send className="w-4 h-4" />}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </div>
-              </div>
-            ))}
+              );
+            })}
             {workouts.length === 0 && (
               <p className="text-sm text-muted-foreground">Sem treinos registrados recentemente.</p>
             )}

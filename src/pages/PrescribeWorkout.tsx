@@ -14,7 +14,7 @@ import { useCoachAthletes } from '@/hooks/useCoachAthletes';
 import { useWorkoutTemplates } from '@/hooks/useWorkoutTemplates';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
-import { Loader2, BookmarkPlus, Trash2, Zap } from 'lucide-react';
+import { Loader2, BookmarkPlus, Trash2, Zap, Users, CheckSquare, Square } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const TYPE_LABELS: Record<string, string> = {
@@ -32,7 +32,6 @@ const TYPE_COLORS: Record<string, string> = {
 };
 
 interface FormState {
-  athlete_id: string;
   date: string;
   type: string;
   planned_duration_min: string;
@@ -55,9 +54,12 @@ export default function PrescribeWorkout() {
   const [templateName, setTemplateName] = useState('');
   const [showSaveTemplate, setShowSaveTemplate] = useState(false);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
+  // Multi-athlete: set of selected athlete IDs
+  const [selectedAthletes, setSelectedAthletes] = useState<Set<string>>(
+    () => new Set(preselectedAthlete ? [preselectedAthlete] : []),
+  );
 
   const [form, setForm] = useState<FormState>({
-    athlete_id: preselectedAthlete,
     date: format(new Date(), 'yyyy-MM-dd'),
     type: 'endurance',
     planned_duration_min: '',
@@ -65,6 +67,22 @@ export default function PrescribeWorkout() {
     planned_tss: '',
     notes: '',
   });
+
+  const toggleAthlete = (id: string) => {
+    setSelectedAthletes((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  const toggleAll = () => {
+    if (selectedAthletes.size === activeAthletes.length) {
+      setSelectedAthletes(new Set());
+    } else {
+      setSelectedAthletes(new Set(activeAthletes.map((a) => a.athlete_id)));
+    }
+  };
 
   const applyTemplate = (templateId: string) => {
     const tpl = templates.find((t) => t.id === templateId);
@@ -82,26 +100,35 @@ export default function PrescribeWorkout() {
   };
 
   const handleSubmit = async () => {
-    if (!user || !form.athlete_id || !form.date || !form.type) {
-      toast.error('Preencha os campos obrigatórios.');
+    if (!user || selectedAthletes.size === 0 || !form.date || !form.type) {
+      toast.error(selectedAthletes.size === 0 ? 'Selecione ao menos um atleta.' : 'Preencha os campos obrigatórios.');
       return;
     }
     setSaving(true);
-    const err = await createPlan({
-      coach_id: user.id,
-      athlete_id: form.athlete_id,
-      date: form.date,
-      type: form.type,
-      planned_duration_min: form.planned_duration_min ? Number(form.planned_duration_min) : null,
-      planned_zone: form.planned_zone || null,
-      planned_tss: form.planned_tss ? Number(form.planned_tss) : null,
-      notes: form.notes || null,
-      status: 'planned',
-      workout_id: null,
-    });
+    const athleteIds = Array.from(selectedAthletes);
+    const errors: string[] = [];
+    for (const athleteId of athleteIds) {
+      const err = await createPlan({
+        coach_id: user.id,
+        athlete_id: athleteId,
+        date: form.date,
+        type: form.type,
+        planned_duration_min: form.planned_duration_min ? Number(form.planned_duration_min) : null,
+        planned_zone: form.planned_zone || null,
+        planned_tss: form.planned_tss ? Number(form.planned_tss) : null,
+        notes: form.notes || null,
+        status: 'planned',
+        workout_id: null,
+      });
+      if (err) errors.push(err);
+    }
     setSaving(false);
-    if (err) { toast.error(err); return; }
-    toast.success('Treino prescrito com sucesso!');
+    if (errors.length > 0) { toast.error(errors[0]); return; }
+    toast.success(
+      athleteIds.length > 1
+        ? `Treino prescrito para ${athleteIds.length} atletas!`
+        : 'Treino prescrito com sucesso!',
+    );
     navigate(-1);
   };
 
@@ -130,12 +157,6 @@ export default function PrescribeWorkout() {
       toast.success(`Template "${name}" removido.`);
       if (selectedTemplateId === id) setSelectedTemplateId(null);
     }
-  };
-
-  const getAthleteLabel = (athleteId: string) => {
-    const a = activeAthletes.find((a) => a.athlete_id === athleteId);
-    if (!a) return athleteId.slice(0, 8) + '...';
-    return a.athlete_name ?? a.athlete_email ?? athleteId.slice(0, 8) + '...';
   };
 
   return (
@@ -214,24 +235,42 @@ export default function PrescribeWorkout() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
-              <Label>Atleta *</Label>
-              <Select
-                value={form.athlete_id}
-                onValueChange={(v) => setForm((f) => ({ ...f, athlete_id: v }))}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecionar atleta">
-                    {form.athlete_id ? getAthleteLabel(form.athlete_id) : 'Selecionar atleta'}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  {activeAthletes.map((a) => (
-                    <SelectItem key={a.athlete_id} value={a.athlete_id}>
-                      {a.athlete_name ?? a.athlete_email ?? a.athlete_id.slice(0, 8) + '...'}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="flex items-center justify-between mb-2">
+                <Label>Atletas * <span className="text-muted-foreground font-normal">({selectedAthletes.size} selecionado{selectedAthletes.size !== 1 ? 's' : ''})</span></Label>
+                {activeAthletes.length > 1 && (
+                  <button type="button" onClick={toggleAll} className="text-xs text-primary hover:underline flex items-center gap-1">
+                    <Users className="w-3 h-3" />
+                    {selectedAthletes.size === activeAthletes.length ? 'Desmarcar todos' : 'Selecionar todos'}
+                  </button>
+                )}
+              </div>
+              <div className="space-y-2">
+                {activeAthletes.map((a) => {
+                  const checked = selectedAthletes.has(a.athlete_id);
+                  return (
+                    <div
+                      key={a.athlete_id}
+                      className={cn(
+                        'flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors',
+                        checked ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/40',
+                      )}
+                      onClick={() => toggleAthlete(a.athlete_id)}
+                    >
+                      {checked
+                        ? <CheckSquare className="w-4 h-4 text-primary shrink-0" />
+                        : <Square className="w-4 h-4 text-muted-foreground shrink-0" />}
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-foreground truncate">
+                          {a.athlete_name ?? a.athlete_email ?? a.athlete_id.slice(0, 8) + '...'}
+                        </p>
+                        {a.athlete_email && a.athlete_name && (
+                          <p className="text-xs text-muted-foreground truncate">{a.athlete_email}</p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
 
             <div>
