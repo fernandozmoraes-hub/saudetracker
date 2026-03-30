@@ -1,44 +1,42 @@
 
 
-## Plano: Implementar Calendário Semanal de Treinos para Coach
+## Plano: Implementar Compliance / Adesão ao Plano para Coach
 
 ### Situação
 
-Os arquivos descritos pelo usuário não estão no projeto. Precisam ser criados/modificados diretamente.
+Os arquivos `useCoachCompliance.tsx` e `ComplianceBadge.tsx` não existem no projeto. O `CoachDashboard.tsx` e `CoachAthleteProfile.tsx` não contêm referências a compliance. Precisam ser criados e integrados.
 
 ### Arquivos a criar
 
-**1. `src/components/coach/CoachCalendarDay.tsx`**
+**1. `src/hooks/useCoachCompliance.tsx`**
 
-Componente que exibe um dia no calendário do coach com:
-- Treino planejado (da tabela `training_plans`): tipo, duração, zona, TSS, notas
-- Status visual com cores: Concluído (verde), Planejado (azul), Não feito (laranja), Pulado (vermelho)
-- Treino realizado (da tabela `workouts`): TSS real, duração, RPE
-- Badge "Extra" quando há treino sem plano correspondente
+- `computeCompliance(plans: TrainingPlan[])`: função pura que retorna `{ total, completed, skipped, missed, rate, consecutiveMissed }`
+  - `completed`: planos com `status === 'completed'`
+  - `skipped`: planos com `status === 'skipped'`
+  - `missed`: planos com `status === 'planned'` e data no passado
+  - `rate`: `completed / total * 100`
+  - `consecutiveMissed`: contagem de treinos ignorados/pulados consecutivos a partir do mais recente
+- `useCoachCompliance()`: hook que busca `training_plans` dos últimos 30 dias via query com `coach_id = user.id`, agrupa por `athlete_id`, aplica `computeCompliance` para cada atleta, retorna `Map<athleteId, ComplianceStats>`
 
-**2. `src/pages/CoachAthleteCalendar.tsx`**
+**2. `src/components/coach/ComplianceBadge.tsx`**
 
-Página de calendário semanal com:
-- Navegação por semanas (anterior/próxima/hoje) usando `subWeeks`/`addWeeks`
-- Resumo semanal: contagem de planejados, concluídos, pulados, extras + barra TSS planejado vs realizado
-- Grid de 7 dias usando `eachDayOfInterval(startOfWeek, endOfWeek)` com locale `ptBR`
-- Dados via `useTrainingPlans(athleteId)` + fetch de workouts do atleta
-- Reutiliza `PageContainer` para layout
+Duas variantes via prop `variant`:
+- **`compact`**: badge colorido mostrando "X/Y este mês" + ícone `AlertTriangle` laranja se `consecutiveMissed >= 3`
+- **`full`**: card com taxa %, barra `Progress`, breakdown em 3 colunas (Concluídos/Pulados/Não feitos), alerta de abandono
+
+Cores: verde (≥80%), amarelo (≥50%), vermelho (<50%)
 
 ### Arquivos a modificar
 
-**3. `src/App.tsx`**
-- Import `CoachAthleteCalendar`
-- Adicionar rota: `<Route path="/coach/athlete/:id/calendar" element={<ProtectedRoute requiredRole="coach"><CoachAthleteCalendar /></ProtectedRoute>} />`
+**3. `src/pages/CoachDashboard.tsx`**
+- Importar `useCoachCompliance` e `ComplianceBadge`
+- Chamar `useCoachCompliance()` no componente
+- No card de cada atleta ativo, adicionar `<ComplianceBadge variant="compact" stats={complianceMap.get(athlete.athlete_id)} />` ao lado do badge "Ativo"
 
 **4. `src/pages/CoachAthleteProfile.tsx`**
-- Adicionar botão "Calendário" ao lado do botão "Voltar" que navega para `/coach/athlete/${athleteId}/calendar`
-
-### Dependências utilizadas (já disponíveis)
-- `date-fns`: `startOfWeek`, `endOfWeek`, `eachDayOfInterval`, `addWeeks`, `subWeeks`, `format`, `isToday`
-- `date-fns/locale/ptBR`
-- `useTrainingPlans` hook existente
-- `supabase` client para fetch de workouts
+- Importar `computeCompliance` e `ComplianceBadge`
+- Calcular compliance a partir dos `plans` já disponíveis via `useTrainingPlans`
+- Adicionar `<ComplianceBadge variant="full" stats={stats} />` como card entre os Alertas e Treinos Planejados
 
 ### Sem alterações no banco de dados
 
