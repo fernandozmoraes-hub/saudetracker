@@ -447,6 +447,42 @@ export type Database = {
           },
         ]
       }
+      workout_templates: {
+        Row: {
+          coach_id: string
+          created_at: string
+          id: string
+          name: string
+          notes: string | null
+          planned_duration_min: number | null
+          planned_tss: number | null
+          planned_zone: string | null
+          type: string
+        }
+        Insert: {
+          coach_id: string
+          created_at?: string
+          id?: string
+          name: string
+          notes?: string | null
+          planned_duration_min?: number | null
+          planned_tss?: number | null
+          planned_zone?: string | null
+          type: string
+        }
+        Update: {
+          coach_id?: string
+          created_at?: string
+          id?: string
+          name?: string
+          notes?: string | null
+          planned_duration_min?: number | null
+          planned_tss?: number | null
+          planned_zone?: string | null
+          type?: string
+        }
+        Relationships: []
+      }
       workouts: {
         Row: {
           avg_hr: number | null
