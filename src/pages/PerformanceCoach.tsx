@@ -64,7 +64,10 @@ const SUGGESTED_QUESTIONS = [
   'Há sinais de fadiga acumulada?',
 ];
 
-const FILTER_INTENTS: Array<{ key: CoachIntent | 'favorites'; label: string }> = [
+type FilterKey = CoachIntent | 'favorites' | 'weekly_report';
+
+const FILTER_INTENTS: Array<{ key: FilterKey; label: string }> = [
+  { key: 'weekly_report', label: '📊 Relatórios' },
   { key: 'recovery', label: 'Recuperação' },
   { key: 'training_load', label: 'Carga' },
   { key: 'body_composition', label: 'Composição' },
