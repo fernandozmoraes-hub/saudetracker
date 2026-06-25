@@ -36,16 +36,24 @@ import {
   Search,
   BookOpen,
   MessageSquare,
+  BarChart3,
+  FileDown,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { buildWeeklyPerformanceContext } from '@/lib/weeklyPerformanceContext';
+import { generateWeeklyReportPdf } from '@/lib/weeklyReportPdf';
 
 interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
   sectionsUsed?: SectionKey[];
   intent?: CoachIntent;
+  isWeeklyReport?: boolean;
+  periodStart?: string;
+  periodEnd?: string;
 }
+
 
 const SUGGESTED_QUESTIONS = [
   'Qual o meu estado fisiológico hoje?',
@@ -56,7 +64,10 @@ const SUGGESTED_QUESTIONS = [
   'Há sinais de fadiga acumulada?',
 ];
 
-const FILTER_INTENTS: Array<{ key: CoachIntent | 'favorites'; label: string }> = [
+type FilterKey = CoachIntent | 'favorites' | 'weekly_report';
+
+const FILTER_INTENTS: Array<{ key: FilterKey; label: string }> = [
+  { key: 'weekly_report', label: '📊 Relatórios' },
   { key: 'recovery', label: 'Recuperação' },
   { key: 'training_load', label: 'Carga' },
   { key: 'body_composition', label: 'Composição' },
@@ -99,11 +110,12 @@ export default function PerformanceCoach() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isReportLoading, setIsReportLoading] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   // Library state
   const [search, setSearch] = useState('');
-  const [filter, setFilter] = useState<CoachIntent | 'favorites' | 'all'>('all');
+  const [filter, setFilter] = useState<FilterKey | 'all'>('all');
   const [openEntry, setOpenEntry] = useState<CoachHistoryEntry | null>(null);
 
   const performanceContext = useMemo(
@@ -201,9 +213,73 @@ export default function PerformanceCoach() {
     }
   };
 
+  const generateWeeklyReport = async () => {
+    if (isReportLoading || isLoading) return;
+    setIsReportLoading(true);
+
+    const weeklyContext = buildWeeklyPerformanceContext({
+      dailyChecks,
+      workouts,
+      alcoholEntries,
+      bodyComposition,
+      equipment,
+    });
+
+    try {
+      const { data, error } = await supabase.functions.invoke('weekly-performance-report', {
+        body: {
+          weeklyContext,
+          periodStart: weeklyContext.periodStart,
+          periodEnd: weeklyContext.periodEnd,
+        },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      const report: string = data?.report ?? '';
+      if (!report) throw new Error('Resposta vazia.');
+
+      const sectionsUsed: string[] = data?.sectionsUsed ?? [];
+
+      setMessages(prev => [
+        ...prev,
+        {
+          role: 'assistant',
+          content: report,
+          isWeeklyReport: true,
+          periodStart: weeklyContext.periodStart,
+          periodEnd: weeklyContext.periodEnd,
+          sectionsUsed: sectionsUsed as SectionKey[],
+        },
+      ]);
+
+      await history.save({
+        question: `Relatório Semanal — ${weeklyContext.periodStart} a ${weeklyContext.periodEnd}`,
+        answer: report,
+        intent: 'weekly_report',
+        sections: sectionsUsed,
+        tags: ['📊 Relatório Semanal'],
+        entryType: 'weekly_report',
+        reportPeriodStart: weeklyContext.periodStart,
+        reportPeriodEnd: weeklyContext.periodEnd,
+      });
+    } catch (err: any) {
+      console.error('weekly-performance-report error:', err);
+      toast({
+        title: 'Não foi possível gerar o relatório',
+        description: err?.message ?? 'Tente novamente em instantes.',
+        variant: 'destructive',
+      });
+      // intentionally NOT saving on error/timeout
+    } finally {
+      setIsReportLoading(false);
+    }
+  };
+
   const filteredHistory = useMemo(() => {
     let list = history.entries;
     if (filter === 'favorites') list = list.filter(e => e.favorite);
+    else if (filter === 'weekly_report') list = list.filter(e => e.entry_type === 'weekly_report');
     else if (filter !== 'all') list = list.filter(e => e.intent_detected === filter);
     if (search.trim()) {
       const q = search.toLowerCase();
@@ -261,6 +337,26 @@ export default function PerformanceCoach() {
             </div>
           )}
 
+          {/* Weekly report trigger */}
+          <Button
+            variant="outline"
+            onClick={generateWeeklyReport}
+            disabled={isReportLoading || isLoading}
+            className="w-full justify-center gap-2"
+          >
+            {isReportLoading ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Gerando relatório semanal...
+              </>
+            ) : (
+              <>
+                <BarChart3 className="w-4 h-4" />
+                📊 Gerar Relatório Semanal
+              </>
+            )}
+          </Button>
+
           {/* Suggested questions */}
           {messages.length === 0 && (
             <div className="space-y-2 animate-slide-up">
@@ -294,11 +390,38 @@ export default function PerformanceCoach() {
                     : 'rounded-xl px-4 py-3 bg-secondary/40 border border-border/40 mr-4'
                 }
               >
-                <div className="text-xs font-medium mb-1 opacity-70">
+                <div className="text-xs font-medium mb-1 opacity-70 flex items-center gap-2">
                   {m.role === 'user' ? 'Você' : 'Performance Coach'}
+                  {m.isWeeklyReport && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/15 text-primary text-[10px] font-semibold">
+                      <BarChart3 className="w-3 h-3" /> Relatório Semanal
+                    </span>
+                  )}
                 </div>
                 <div className="text-sm space-y-1">{renderMarkdown(m.content)}</div>
-                {m.role === 'assistant' && m.sectionsUsed && m.sectionsUsed.length > 0 && (
+                {m.isWeeklyReport && m.periodStart && m.periodEnd && (
+                  <div className="mt-3 pt-2 border-t border-border/30 flex items-center justify-between gap-2">
+                    <span className="text-[10px] text-muted-foreground">
+                      Período: {m.periodStart} → {m.periodEnd}
+                    </span>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 gap-1 text-xs"
+                      onClick={() =>
+                        generateWeeklyReportPdf({
+                          report: m.content,
+                          periodStart: m.periodStart!,
+                          periodEnd: m.periodEnd!,
+                        })
+                      }
+                    >
+                      <FileDown className="w-3.5 h-3.5" />
+                      Exportar PDF
+                    </Button>
+                  </div>
+                )}
+                {!m.isWeeklyReport && m.role === 'assistant' && m.sectionsUsed && m.sectionsUsed.length > 0 && (
                   <div className="mt-3 pt-2 border-t border-border/30 text-xs text-muted-foreground">
                     <span className="opacity-70">Dados utilizados:</span>{' '}
                     {m.sectionsUsed.map(s => (
@@ -391,8 +514,10 @@ export default function PerformanceCoach() {
           ) : (
             <div className="space-y-2">
               {filteredHistory.map(e => {
-                const intentLabel =
-                  INTENT_LABELS[e.intent_detected as CoachIntent] ?? e.intent_detected;
+                const isReport = e.entry_type === 'weekly_report';
+                const intentLabel = isReport
+                  ? '📊 Relatório Semanal'
+                  : INTENT_LABELS[e.intent_detected as CoachIntent] ?? e.intent_detected;
                 const firstLine = e.answer
                   .split('\n')
                   .map(l => l.replace(/\*\*/g, '').trim())
@@ -407,13 +532,20 @@ export default function PerformanceCoach() {
                       className="w-full text-left space-y-1"
                     >
                       <div className="flex items-center justify-between gap-2">
-                        <p className="text-sm font-medium line-clamp-1">{e.question}</p>
+                        <p className="text-sm font-medium line-clamp-1 flex items-center gap-1.5">
+                          {isReport && <BarChart3 className="w-3.5 h-3.5 text-primary flex-shrink-0" />}
+                          {e.question}
+                        </p>
                         <span className="text-[10px] text-muted-foreground flex-shrink-0">
                           {format(new Date(e.created_at), "d MMM, HH:mm", { locale: ptBR })}
                         </span>
                       </div>
                       <p className="text-xs text-muted-foreground line-clamp-1">{firstLine}</p>
-                      <span className="inline-block text-[10px] px-2 py-0.5 rounded-full bg-secondary/70 border border-border/40">
+                      <span className={`inline-block text-[10px] px-2 py-0.5 rounded-full border ${
+                        isReport
+                          ? 'bg-primary/15 text-primary border-primary/30'
+                          : 'bg-secondary/70 border-border/40'
+                      }`}>
                         {intentLabel}
                       </span>
                     </button>
@@ -464,21 +596,48 @@ export default function PerformanceCoach() {
                   </span>
                   <span>•</span>
                   <span className="px-2 py-0.5 rounded-full bg-secondary/70 border border-border/40">
-                    {INTENT_LABELS[openEntry.intent_detected as CoachIntent] ??
-                      openEntry.intent_detected}
+                    {openEntry.entry_type === 'weekly_report'
+                      ? '📊 Relatório Semanal'
+                      : INTENT_LABELS[openEntry.intent_detected as CoachIntent] ??
+                        openEntry.intent_detected}
                   </span>
                 </div>
                 <div className="space-y-1">{renderMarkdown(openEntry.answer)}</div>
-                {openEntry.data_sections_used.length > 0 && (
-                  <div className="pt-3 border-t border-border/40 text-xs text-muted-foreground">
-                    <span className="opacity-70">Seções utilizadas:</span>{' '}
-                    {openEntry.data_sections_used.map(s => (
-                      <span key={s} className="inline-flex items-center mr-2">
-                        ✓ {SECTION_LABELS[s as SectionKey] ?? s}
+                {openEntry.entry_type === 'weekly_report' &&
+                  openEntry.report_period_start &&
+                  openEntry.report_period_end && (
+                    <div className="pt-3 border-t border-border/40 flex items-center justify-between gap-2">
+                      <span className="text-[10px] text-muted-foreground">
+                        Período: {openEntry.report_period_start} → {openEntry.report_period_end}
                       </span>
-                    ))}
-                  </div>
-                )}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 gap-1 text-xs"
+                        onClick={() =>
+                          generateWeeklyReportPdf({
+                            report: openEntry.answer,
+                            periodStart: openEntry.report_period_start!,
+                            periodEnd: openEntry.report_period_end!,
+                          })
+                        }
+                      >
+                        <FileDown className="w-3.5 h-3.5" />
+                        Exportar PDF
+                      </Button>
+                    </div>
+                  )}
+                {openEntry.entry_type !== 'weekly_report' &&
+                  openEntry.data_sections_used.length > 0 && (
+                    <div className="pt-3 border-t border-border/40 text-xs text-muted-foreground">
+                      <span className="opacity-70">Seções utilizadas:</span>{' '}
+                      {openEntry.data_sections_used.map(s => (
+                        <span key={s} className="inline-flex items-center mr-2">
+                          ✓ {SECTION_LABELS[s as SectionKey] ?? s}
+                        </span>
+                      ))}
+                    </div>
+                  )}
               </div>
             </>
           )}
