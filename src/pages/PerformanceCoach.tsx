@@ -36,9 +36,23 @@ import {
   Search,
   BookOpen,
   MessageSquare,
+  BarChart3,
+  FileDown,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { buildWeeklyPerformanceContext } from '@/lib/weeklyPerformanceContext';
+import { generateWeeklyReportPdf } from '@/lib/weeklyReportPdf';
+
+interface ChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+  sectionsUsed?: SectionKey[];
+  intent?: CoachIntent;
+  isWeeklyReport?: boolean;
+  periodStart?: string;
+  periodEnd?: string;
+}
 
 interface ChatMessage {
   role: 'user' | 'assistant';
