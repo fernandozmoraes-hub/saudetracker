@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { MetricCard } from '@/components/ui/MetricCard';
 import { StatusBadge } from '@/components/ui/StatusBadge';
-import { AICoach } from '@/components/AICoach';
+
 import { TrendCharts } from '@/components/TrendCharts';
 import { getTodayMetrics } from '@/lib/calculations';
 import { useData } from '@/hooks/useData';
