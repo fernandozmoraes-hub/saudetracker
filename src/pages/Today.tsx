@@ -10,7 +10,8 @@ import { useAlcoholIntake } from '@/hooks/useAlcoholIntake';
 import { getAlcoholHRVCorrelation, getCorrelationColor, getCorrelationBgColor, getWeeklyPattern, getWeeklyPatternColor, getTrendArrow } from '@/lib/alcoholCalcs';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Heart, TrendingUp, TrendingDown, Activity, AlertTriangle, CheckCircle, PauseCircle, Loader2, Dumbbell, Wine } from 'lucide-react';
+import { Heart, TrendingUp, TrendingDown, Activity, AlertTriangle, CheckCircle, PauseCircle, Loader2, Dumbbell, Wine, Brain, ChevronRight } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 const recommendationConfig = {
   maintain: {
@@ -130,6 +131,26 @@ export default function Today() {
       
       {/* AI Coach Analysis */}
       <AICoach />
+
+      {/* Performance Coach access */}
+      <Link
+        to="/performance-coach"
+        className="flex items-center justify-between gradient-card rounded-xl p-5 border border-border/50 animate-slide-up hover:border-primary/40 transition-colors"
+      >
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+            <Brain className="w-5 h-5 text-primary" />
+          </div>
+          <div>
+            <p className="font-display font-semibold">Performance Coach</p>
+            <p className="text-xs text-muted-foreground">Análise integrada de todos os seus dados</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-1 text-sm text-primary font-medium">
+          Abrir
+          <ChevronRight className="w-4 h-4" />
+        </div>
+      </Link>
       
       {/* Alcohol Impact Card - only if sufficient data */}
       {correlation && (
