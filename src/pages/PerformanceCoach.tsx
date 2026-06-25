@@ -514,8 +514,10 @@ export default function PerformanceCoach() {
           ) : (
             <div className="space-y-2">
               {filteredHistory.map(e => {
-                const intentLabel =
-                  INTENT_LABELS[e.intent_detected as CoachIntent] ?? e.intent_detected;
+                const isReport = e.entry_type === 'weekly_report';
+                const intentLabel = isReport
+                  ? '📊 Relatório Semanal'
+                  : INTENT_LABELS[e.intent_detected as CoachIntent] ?? e.intent_detected;
                 const firstLine = e.answer
                   .split('\n')
                   .map(l => l.replace(/\*\*/g, '').trim())
@@ -530,13 +532,20 @@ export default function PerformanceCoach() {
                       className="w-full text-left space-y-1"
                     >
                       <div className="flex items-center justify-between gap-2">
-                        <p className="text-sm font-medium line-clamp-1">{e.question}</p>
+                        <p className="text-sm font-medium line-clamp-1 flex items-center gap-1.5">
+                          {isReport && <BarChart3 className="w-3.5 h-3.5 text-primary flex-shrink-0" />}
+                          {e.question}
+                        </p>
                         <span className="text-[10px] text-muted-foreground flex-shrink-0">
                           {format(new Date(e.created_at), "d MMM, HH:mm", { locale: ptBR })}
                         </span>
                       </div>
                       <p className="text-xs text-muted-foreground line-clamp-1">{firstLine}</p>
-                      <span className="inline-block text-[10px] px-2 py-0.5 rounded-full bg-secondary/70 border border-border/40">
+                      <span className={`inline-block text-[10px] px-2 py-0.5 rounded-full border ${
+                        isReport
+                          ? 'bg-primary/15 text-primary border-primary/30'
+                          : 'bg-secondary/70 border-border/40'
+                      }`}>
                         {intentLabel}
                       </span>
                     </button>
