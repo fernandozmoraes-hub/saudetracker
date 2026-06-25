@@ -242,6 +242,42 @@ export type Database = {
         }
         Relationships: []
       }
+      performance_coach_history: {
+        Row: {
+          answer: string
+          created_at: string
+          data_sections_used: string[]
+          favorite: boolean
+          id: string
+          intent_detected: string
+          question: string
+          tags: string[]
+          user_id: string
+        }
+        Insert: {
+          answer: string
+          created_at?: string
+          data_sections_used?: string[]
+          favorite?: boolean
+          id?: string
+          intent_detected: string
+          question: string
+          tags?: string[]
+          user_id: string
+        }
+        Update: {
+          answer?: string
+          created_at?: string
+          data_sections_used?: string[]
+          favorite?: boolean
+          id?: string
+          intent_detected?: string
+          question?: string
+          tags?: string[]
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
