@@ -596,21 +596,48 @@ export default function PerformanceCoach() {
                   </span>
                   <span>•</span>
                   <span className="px-2 py-0.5 rounded-full bg-secondary/70 border border-border/40">
-                    {INTENT_LABELS[openEntry.intent_detected as CoachIntent] ??
-                      openEntry.intent_detected}
+                    {openEntry.entry_type === 'weekly_report'
+                      ? '📊 Relatório Semanal'
+                      : INTENT_LABELS[openEntry.intent_detected as CoachIntent] ??
+                        openEntry.intent_detected}
                   </span>
                 </div>
                 <div className="space-y-1">{renderMarkdown(openEntry.answer)}</div>
-                {openEntry.data_sections_used.length > 0 && (
-                  <div className="pt-3 border-t border-border/40 text-xs text-muted-foreground">
-                    <span className="opacity-70">Seções utilizadas:</span>{' '}
-                    {openEntry.data_sections_used.map(s => (
-                      <span key={s} className="inline-flex items-center mr-2">
-                        ✓ {SECTION_LABELS[s as SectionKey] ?? s}
+                {openEntry.entry_type === 'weekly_report' &&
+                  openEntry.report_period_start &&
+                  openEntry.report_period_end && (
+                    <div className="pt-3 border-t border-border/40 flex items-center justify-between gap-2">
+                      <span className="text-[10px] text-muted-foreground">
+                        Período: {openEntry.report_period_start} → {openEntry.report_period_end}
                       </span>
-                    ))}
-                  </div>
-                )}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 gap-1 text-xs"
+                        onClick={() =>
+                          generateWeeklyReportPdf({
+                            report: openEntry.answer,
+                            periodStart: openEntry.report_period_start!,
+                            periodEnd: openEntry.report_period_end!,
+                          })
+                        }
+                      >
+                        <FileDown className="w-3.5 h-3.5" />
+                        Exportar PDF
+                      </Button>
+                    </div>
+                  )}
+                {openEntry.entry_type !== 'weekly_report' &&
+                  openEntry.data_sections_used.length > 0 && (
+                    <div className="pt-3 border-t border-border/40 text-xs text-muted-foreground">
+                      <span className="opacity-70">Seções utilizadas:</span>{' '}
+                      {openEntry.data_sections_used.map(s => (
+                        <span key={s} className="inline-flex items-center mr-2">
+                          ✓ {SECTION_LABELS[s as SectionKey] ?? s}
+                        </span>
+                      ))}
+                    </div>
+                  )}
               </div>
             </>
           )}
