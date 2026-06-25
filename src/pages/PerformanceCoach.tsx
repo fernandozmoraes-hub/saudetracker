@@ -213,9 +213,73 @@ export default function PerformanceCoach() {
     }
   };
 
+  const generateWeeklyReport = async () => {
+    if (isReportLoading || isLoading) return;
+    setIsReportLoading(true);
+
+    const weeklyContext = buildWeeklyPerformanceContext({
+      dailyChecks,
+      workouts,
+      alcoholEntries,
+      bodyComposition,
+      equipment,
+    });
+
+    try {
+      const { data, error } = await supabase.functions.invoke('weekly-performance-report', {
+        body: {
+          weeklyContext,
+          periodStart: weeklyContext.periodStart,
+          periodEnd: weeklyContext.periodEnd,
+        },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      const report: string = data?.report ?? '';
+      if (!report) throw new Error('Resposta vazia.');
+
+      const sectionsUsed: string[] = data?.sectionsUsed ?? [];
+
+      setMessages(prev => [
+        ...prev,
+        {
+          role: 'assistant',
+          content: report,
+          isWeeklyReport: true,
+          periodStart: weeklyContext.periodStart,
+          periodEnd: weeklyContext.periodEnd,
+          sectionsUsed: sectionsUsed as SectionKey[],
+        },
+      ]);
+
+      await history.save({
+        question: `Relatório Semanal — ${weeklyContext.periodStart} a ${weeklyContext.periodEnd}`,
+        answer: report,
+        intent: 'weekly_report',
+        sections: sectionsUsed,
+        tags: ['📊 Relatório Semanal'],
+        entryType: 'weekly_report',
+        reportPeriodStart: weeklyContext.periodStart,
+        reportPeriodEnd: weeklyContext.periodEnd,
+      });
+    } catch (err: any) {
+      console.error('weekly-performance-report error:', err);
+      toast({
+        title: 'Não foi possível gerar o relatório',
+        description: err?.message ?? 'Tente novamente em instantes.',
+        variant: 'destructive',
+      });
+      // intentionally NOT saving on error/timeout
+    } finally {
+      setIsReportLoading(false);
+    }
+  };
+
   const filteredHistory = useMemo(() => {
     let list = history.entries;
     if (filter === 'favorites') list = list.filter(e => e.favorite);
+    else if (filter === 'weekly_report') list = list.filter(e => e.entry_type === 'weekly_report');
     else if (filter !== 'all') list = list.filter(e => e.intent_detected === filter);
     if (search.trim()) {
       const q = search.toLowerCase();
