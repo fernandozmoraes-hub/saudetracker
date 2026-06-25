@@ -24,6 +24,7 @@ import Equipment from "./pages/Equipment";
 import BodyComposition from "./pages/BodyComposition";
 import AlcoholIntake from "./pages/AlcoholIntake";
 import ResetPassword from "./pages/ResetPassword";
+import PerformanceCoach from "./pages/PerformanceCoach";
 import SelectRole from "./pages/SelectRole";
 import CoachDashboard from "./pages/CoachDashboard";
 import CoachAthleteProfile from "./pages/CoachAthleteProfile";
@@ -61,6 +62,7 @@ const App = () => (
                       <Route path="/equipment" element={<ProtectedRoute><Equipment /></ProtectedRoute>} />
                       <Route path="/body-composition" element={<ProtectedRoute><BodyComposition /></ProtectedRoute>} />
                       <Route path="/alcohol-intake" element={<ProtectedRoute><AlcoholIntake /></ProtectedRoute>} />
+                      <Route path="/performance-coach" element={<ProtectedRoute><PerformanceCoach /></ProtectedRoute>} />
                       {/* Coach routes */}
                       <Route path="/coach" element={<ProtectedRoute requiredRole="coach"><CoachDashboard /></ProtectedRoute>} />
                       <Route path="/coach/athlete/:id" element={<ProtectedRoute requiredRole="coach"><CoachAthleteProfile /></ProtectedRoute>} />
