@@ -110,11 +110,12 @@ export default function PerformanceCoach() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isReportLoading, setIsReportLoading] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   // Library state
   const [search, setSearch] = useState('');
-  const [filter, setFilter] = useState<CoachIntent | 'favorites' | 'all'>('all');
+  const [filter, setFilter] = useState<FilterKey | 'all'>('all');
   const [openEntry, setOpenEntry] = useState<CoachHistoryEntry | null>(null);
 
   const performanceContext = useMemo(
