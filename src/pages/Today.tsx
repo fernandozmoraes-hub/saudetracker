@@ -129,8 +129,6 @@ export default function Today() {
         <p className="text-sm text-muted-foreground">{recommendation.description}</p>
       </div>
       
-      {/* AI Coach Analysis */}
-      <AICoach />
 
       {/* Performance Coach access */}
       <Link
