@@ -69,7 +69,10 @@ export function usePerformanceCoachHistory() {
           intent_detected: input.intent,
           data_sections_used: input.sections,
           tags: input.tags,
-        })
+          entry_type: input.entryType ?? 'chat',
+          report_period_start: input.reportPeriodStart ?? null,
+          report_period_end: input.reportPeriodEnd ?? null,
+        } as any)
         .select()
         .single();
       if (error) {
