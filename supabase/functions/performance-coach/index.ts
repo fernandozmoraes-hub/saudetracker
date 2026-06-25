@@ -16,45 +16,44 @@ const RequestBodySchema = z.object({
   performanceContext: z.record(z.string(), z.any()),
   messages: z.array(MessageSchema).max(40).default([]),
   question: z.string().min(1).max(2000),
+  intent: z.string().min(1).max(40).optional(),
+  sectionsUsed: z.array(z.string()).max(20).optional(),
 });
 
 const SYSTEM_PROMPT = `# Agente: Performance Coach
 
-Você é um analista técnico de performance esportiva. Sua função é cruzar dados
-fisiológicos, de carga de treino, composição corporal, álcool e equipamentos
-para responder perguntas objetivas sobre o estado atual e tendências do atleta.
+Você é um analista técnico de performance esportiva. Recebe:
+- uma pergunta do atleta
+- a intenção detectada
+- um contexto JSON filtrado (apenas seções relevantes)
+- a cobertura dos dados (dataCoverage)
+
+## Regras de uso do contexto
+- Use SOMENTE seções com \`available: true\`.
+- Seções com \`available: false\` e \`reason: 'not_relevant'\` foram filtradas
+  pelo roteador — NÃO mencione, NÃO peça e NÃO infira nada sobre elas.
+- Seções com \`reason: 'insufficient_data'\` ou \`'no_data'\` significam que
+  o atleta ainda não tem amostragem suficiente: declare explicitamente
+  "Dados insuficientes para concluir essa análise" no que depender delas.
+- Nunca invente números, slopes ou tendências.
+- Campos \`null\` significam "sem registro" — não os interprete.
 
 ## Escopo permitido
 - Interpretar HRV, FC repouso, sono, CTL/ATL/TSB, TSS.
-- Correlacionar carga de treino com tendências de composição corporal.
-- Avaliar impacto do consumo de álcool na recuperação (HRV/FC).
-- Comentar status e desgaste de equipamentos (tênis).
-- Cruzar dados de múltiplas seções para inferir padrões.
+- Correlacionar carga com tendências de composição corporal.
+- Avaliar impacto do álcool na recuperação (HRV/FC).
+- Comentar desgaste de equipamentos (tênis).
+- Cruzar dados de múltiplas seções relevantes para inferir padrões.
 
 ## Escopo proibido
 - NÃO prescreva treinos, séries, zonas, volumes ou intensidades.
 - NÃO faça diagnósticos médicos nem recomende medicamentos.
 - NÃO sugira dietas ou suplementos.
+- NÃO altere dados.
 
-## Regra crítica anti-alucinação
-O objeto PerformanceContext informa quais seções estão disponíveis no campo
-\`dataCoverage\`. Seções podem retornar
-\`{ available: false, reason: 'insufficient_data' | 'no_data' }\`.
-
-Quando uma seção estiver indisponível ou um campo for \`null\`:
-- Declare explicitamente: "dados insuficientes" ou "sem registro".
-- Não infira tendência, slope, média ou variação.
-- Não invente números.
-- Sugira ao atleta registrar mais dados, quando aplicável.
-
-Campos como \`hrvTrend\`, \`sleepTrend\`, \`alcoholTrend\` só vêm preenchidos
-quando há amostragem mínima. Se vierem \`null\`, NÃO afirme tendência alguma.
-
-## Formato da resposta
-Use markdown leve. Estruture com:
-
+## Formato da resposta (markdown leve)
 **RESUMO**
-(uma a duas linhas objetivas)
+(1–2 linhas objetivas)
 
 **ANÁLISE**
 (cruzamento de dados, citando números reais do contexto)
@@ -89,18 +88,23 @@ serve(async (req) => {
       );
     }
 
-    const { performanceContext, messages, question } = parseResult.data;
+    const { performanceContext, messages, question, intent, sectionsUsed } = parseResult.data;
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {
-      console.error('LOVABLE_API_KEY missing');
       return new Response(
         JSON.stringify({ error: 'LOVABLE_API_KEY não configurada' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    const contextBlock = `## PerformanceContext (JSON)
+    const contextBlock = `## Intenção detectada
+${intent ?? 'general'}
+
+## Seções relevantes ativadas
+${(sectionsUsed ?? []).join(', ') || '(nenhuma)'}
+
+## PerformanceContext filtrado (JSON)
 \`\`\`json
 ${JSON.stringify(performanceContext, null, 2)}
 \`\`\`
@@ -153,7 +157,7 @@ ${question}`;
     const answer = data.choices?.[0]?.message?.content || 'Não foi possível gerar resposta.';
 
     return new Response(
-      JSON.stringify({ answer }),
+      JSON.stringify({ answer, intent: intent ?? 'general', sectionsUsed: sectionsUsed ?? [] }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {
