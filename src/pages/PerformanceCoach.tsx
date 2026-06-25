@@ -54,12 +54,6 @@ interface ChatMessage {
   periodEnd?: string;
 }
 
-interface ChatMessage {
-  role: 'user' | 'assistant';
-  content: string;
-  sectionsUsed?: SectionKey[];
-  intent?: CoachIntent;
-}
 
 const SUGGESTED_QUESTIONS = [
   'Qual o meu estado fisiológico hoje?',
