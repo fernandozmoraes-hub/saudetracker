@@ -3,6 +3,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 
+export type CoachEntryType = 'chat' | 'weekly_report';
+
 export interface CoachHistoryEntry {
   id: string;
   user_id: string;
@@ -13,6 +15,9 @@ export interface CoachHistoryEntry {
   tags: string[];
   favorite: boolean;
   created_at: string;
+  entry_type: CoachEntryType;
+  report_period_start: string | null;
+  report_period_end: string | null;
 }
 
 interface SaveInput {
@@ -21,6 +26,9 @@ interface SaveInput {
   intent: string;
   sections: string[];
   tags: string[];
+  entryType?: CoachEntryType;
+  reportPeriodStart?: string;
+  reportPeriodEnd?: string;
 }
 
 export function usePerformanceCoachHistory() {
