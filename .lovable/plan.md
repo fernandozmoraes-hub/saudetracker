@@ -1,26 +1,27 @@
+## Plano: Página "Performance Coach" (final, com fallback anti-alucinação)
 
+### Arquivos a criar
+- **`src/lib/performanceContext.ts`** — `buildPerformanceContext({ dailyChecks, workouts, alcoholEntries, bodyComposition, equipment })` retornando objeto com 6 seções (`today`, `last7Days`, `last30Days`, `bodyComposition`, `recentWorkouts`, `equipment`) + `alcoholCorrelation` + `dataCoverage`. Apenas agrega cálculos existentes (`lib/calculations.ts`, `lib/bodyCompositionCalcs.ts`, `lib/alcoholCalcs.ts`).
+- **`supabase/functions/performance-coach/index.ts`** — nova edge function, CORS + Zod, `LOVABLE_API_KEY`, modelo `google/gemini-2.5-flash`. System prompt reforça regra anti-alucinação. Trata 429/402.
+- **`src/pages/PerformanceCoach.tsx`** — chat coerente com tokens do app, chips de sugestões, aviso de cobertura limitada, histórico em memória.
 
-## Plano: Corrigir validação do AI Coach Edge Function
+### Arquivos a editar (mínimo)
+- **`src/App.tsx`** — `import PerformanceCoach` e rota `<Route path="/performance-coach" element={<ProtectedRoute><PerformanceCoach /></ProtectedRoute>} />`.
+- **`src/pages/Today.tsx`** — adicionar card "Performance Coach" com botão "Abrir Performance Coach" → `/performance-coach`, mantendo o padrão visual.
 
-### Diagnóstico
+### Fallback seguro (anti-alucinação)
+- Cada seção retorna `{ available: false, reason: 'no_data' | 'insufficient_data', requiredDays?, foundDays? }` quando faltar amostragem mínima:
+  - `today`: requer check-in do dia.
+  - `last7Days`: requer ≥3 dias com check-in.
+  - `last30Days`: `hrvTrend` e `sleepTrend` só preenchidos com ≥10 pontos; `alcoholTrend` só com ≥3 semanas com dados.
+  - `bodyComposition`: trend 30d só com ≥2 medições e span ≥14 dias.
+  - `recentWorkouts` / `equipment`: arrays vazios quando não houver registros.
+- Campo top-level `dataCoverage` enumera seções `available` / `unavailable`.
+- System prompt instrui o agente a declarar "dados insuficientes" e nunca inferir tendência quando o campo for `null` ou `available: false`.
 
-Os logs mostram repetidamente: `fieldErrors: { analysisData: [ "Number must be greater than or equal to 20" ] }`. O campo `restingHr` no `TodayDataSchema` exige `.min(20)`, mas o valor enviado está abaixo de 20 (provavelmente 0 quando não preenchido).
+### Não muda
+- `BottomNav.tsx`, `ai-coach`, `AICoach.tsx`, triggers, cálculos, tabelas, RLS, demais páginas.
 
-### Correção
-
-**Arquivo: `supabase/functions/ai-coach/index.ts`**
-
-Alterar o `TodayDataSchema` para aceitar `restingHr` a partir de 0:
-
-```typescript
-restingHr: z.number().min(0).max(250),
-```
-
-Isso permite que o sistema funcione mesmo quando o usuário não preencheu a FC de repouso (valor 0), sem quebrar a validação. O valor 0 será tratado como "não informado" na análise.
-
-### Arquivos alterados
-
-| Arquivo | Alteração |
-|---------|-----------|
-| `supabase/functions/ai-coach/index.ts` | `restingHr` min de 20 → 0 |
-
+### Considerações
+- Sem migration, sem novos secrets (`LOVABLE_API_KEY` já existe).
+- Histórico apenas em sessão; sem persistência.
