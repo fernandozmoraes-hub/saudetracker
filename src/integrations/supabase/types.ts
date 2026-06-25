@@ -247,10 +247,13 @@ export type Database = {
           answer: string
           created_at: string
           data_sections_used: string[]
+          entry_type: string
           favorite: boolean
           id: string
           intent_detected: string
           question: string
+          report_period_end: string | null
+          report_period_start: string | null
           tags: string[]
           user_id: string
         }
@@ -258,10 +261,13 @@ export type Database = {
           answer: string
           created_at?: string
           data_sections_used?: string[]
+          entry_type?: string
           favorite?: boolean
           id?: string
           intent_detected: string
           question: string
+          report_period_end?: string | null
+          report_period_start?: string | null
           tags?: string[]
           user_id: string
         }
@@ -269,10 +275,13 @@ export type Database = {
           answer?: string
           created_at?: string
           data_sections_used?: string[]
+          entry_type?: string
           favorite?: boolean
           id?: string
           intent_detected?: string
           question?: string
+          report_period_end?: string | null
+          report_period_start?: string | null
           tags?: string[]
           user_id?: string
         }
