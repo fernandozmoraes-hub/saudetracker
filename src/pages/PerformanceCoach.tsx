@@ -390,11 +390,38 @@ export default function PerformanceCoach() {
                     : 'rounded-xl px-4 py-3 bg-secondary/40 border border-border/40 mr-4'
                 }
               >
-                <div className="text-xs font-medium mb-1 opacity-70">
+                <div className="text-xs font-medium mb-1 opacity-70 flex items-center gap-2">
                   {m.role === 'user' ? 'Você' : 'Performance Coach'}
+                  {m.isWeeklyReport && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/15 text-primary text-[10px] font-semibold">
+                      <BarChart3 className="w-3 h-3" /> Relatório Semanal
+                    </span>
+                  )}
                 </div>
                 <div className="text-sm space-y-1">{renderMarkdown(m.content)}</div>
-                {m.role === 'assistant' && m.sectionsUsed && m.sectionsUsed.length > 0 && (
+                {m.isWeeklyReport && m.periodStart && m.periodEnd && (
+                  <div className="mt-3 pt-2 border-t border-border/30 flex items-center justify-between gap-2">
+                    <span className="text-[10px] text-muted-foreground">
+                      Período: {m.periodStart} → {m.periodEnd}
+                    </span>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 gap-1 text-xs"
+                      onClick={() =>
+                        generateWeeklyReportPdf({
+                          report: m.content,
+                          periodStart: m.periodStart!,
+                          periodEnd: m.periodEnd!,
+                        })
+                      }
+                    >
+                      <FileDown className="w-3.5 h-3.5" />
+                      Exportar PDF
+                    </Button>
+                  </div>
+                )}
+                {!m.isWeeklyReport && m.role === 'assistant' && m.sectionsUsed && m.sectionsUsed.length > 0 && (
                   <div className="mt-3 pt-2 border-t border-border/30 text-xs text-muted-foreground">
                     <span className="opacity-70">Dados utilizados:</span>{' '}
                     {m.sectionsUsed.map(s => (
