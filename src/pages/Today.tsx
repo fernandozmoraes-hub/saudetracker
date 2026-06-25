@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { MetricCard } from '@/components/ui/MetricCard';
 import { StatusBadge } from '@/components/ui/StatusBadge';
-import { AICoach } from '@/components/AICoach';
+
 import { TrendCharts } from '@/components/TrendCharts';
 import { getTodayMetrics } from '@/lib/calculations';
 import { useData } from '@/hooks/useData';
@@ -129,8 +129,6 @@ export default function Today() {
         <p className="text-sm text-muted-foreground">{recommendation.description}</p>
       </div>
       
-      {/* AI Coach Analysis */}
-      <AICoach />
 
       {/* Performance Coach access */}
       <Link
