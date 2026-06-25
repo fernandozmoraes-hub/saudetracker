@@ -337,6 +337,26 @@ export default function PerformanceCoach() {
             </div>
           )}
 
+          {/* Weekly report trigger */}
+          <Button
+            variant="outline"
+            onClick={generateWeeklyReport}
+            disabled={isReportLoading || isLoading}
+            className="w-full justify-center gap-2"
+          >
+            {isReportLoading ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Gerando relatório semanal...
+              </>
+            ) : (
+              <>
+                <BarChart3 className="w-4 h-4" />
+                📊 Gerar Relatório Semanal
+              </>
+            )}
+          </Button>
+
           {/* Suggested questions */}
           {messages.length === 0 && (
             <div className="space-y-2 animate-slide-up">
