@@ -59,6 +59,17 @@ export default function Today() {
     [alcoholEntries, dailyChecks]
   );
   const weeklyPattern = useMemo(() => getWeeklyPattern(alcoholEntries), [alcoholEntries]);
+
+  const [period, setPeriod] = useState<PeriodKey>(() => {
+    if (typeof window === 'undefined') return '14D';
+    const stored = window.localStorage.getItem(STORAGE_KEY) as PeriodKey | null;
+    return stored && PERIOD_OPTIONS.some(p => p.key === stored) ? stored : '14D';
+  });
+  useEffect(() => {
+    try { window.localStorage.setItem(STORAGE_KEY, period); } catch { /* ignore */ }
+  }, [period]);
+  const activePeriod = PERIOD_OPTIONS.find(p => p.key === period) ?? PERIOD_OPTIONS[0];
+
   
   if (isLoading) {
     return (
