@@ -433,21 +433,49 @@ export interface DailyTrendData {
 }
 
 export function get14DayTrend(dailyChecks: DailyCheck[], workouts: Workout[]): DailyTrendData[] {
+  return getTrendData(14, dailyChecks, workouts);
+}
+
+/**
+ * Generalized trend data builder. Uses identical per-day calculations as
+ * get14DayTrend — only the temporal range varies. `days='all'` spans from the
+ * oldest available check-in or workout up to today.
+ */
+export function getTrendData(
+  days: number | 'all',
+  dailyChecks: DailyCheck[],
+  workouts: Workout[],
+): DailyTrendData[] {
   const today = new Date();
+  let span: number;
+
+  if (days === 'all') {
+    const allDates: string[] = [
+      ...dailyChecks.map(c => c.date),
+      ...workouts.map(w => w.date),
+    ].filter(Boolean);
+    if (allDates.length === 0) return [];
+    const oldest = allDates.sort()[0];
+    const [y, m, d] = oldest.split('-').map(Number);
+    const oldestDate = new Date(y, m - 1, d);
+    const diffMs = today.getTime() - oldestDate.getTime();
+    span = Math.max(1, Math.floor(diffMs / (1000 * 60 * 60 * 24)) + 1);
+  } else {
+    span = Math.max(1, days);
+  }
+
   const trend: DailyTrendData[] = [];
-  
-  for (let i = 13; i >= 0; i--) {
+  for (let i = span - 1; i >= 0; i--) {
     const targetDate = subDays(today, i);
     const dateStr = format(targetDate, 'yyyy-MM-dd');
     const displayDate = format(targetDate, 'dd/MM');
-    
+
     const check = dailyChecks.find(c => c.date === dateStr);
     const baseline = getHRVBaseline7d(dateStr, dailyChecks);
-    // TSS v2: CTL/ATL use tssFinal directly
     const ctl = calculateCTL(dateStr, workouts);
     const atl = calculateATL(dateStr, workouts);
     const tsb = ctl - atl;
-    
+
     trend.push({
       date: displayDate,
       fullDate: dateStr,
@@ -458,6 +486,7 @@ export function get14DayTrend(dailyChecks: DailyCheck[], workouts: Workout[]): D
       tsb,
     });
   }
-  
+
   return trend;
 }
+

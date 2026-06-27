@@ -1,9 +1,10 @@
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { MetricCard } from '@/components/ui/MetricCard';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 
-import { TrendCharts } from '@/components/TrendCharts';
+import { TrendCharts, TrendPeriod } from '@/components/TrendCharts';
+import { Button } from '@/components/ui/button';
 import { getTodayMetrics } from '@/lib/calculations';
 import { useData } from '@/hooks/useData';
 import { useAlcoholIntake } from '@/hooks/useAlcoholIntake';
@@ -12,6 +13,18 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Heart, TrendingUp, TrendingDown, Activity, AlertTriangle, CheckCircle, PauseCircle, Loader2, Dumbbell, Wine, Brain, ChevronRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
+
+type PeriodKey = '14D' | '30D' | '90D' | '180D' | '1A' | 'Tudo';
+const PERIOD_OPTIONS: { key: PeriodKey; days: TrendPeriod; label: string }[] = [
+  { key: '14D', days: 14, label: '14 dias' },
+  { key: '30D', days: 30, label: '30 dias' },
+  { key: '90D', days: 90, label: '90 dias' },
+  { key: '180D', days: 180, label: '180 dias' },
+  { key: '1A', days: 365, label: '1 ano' },
+  { key: 'Tudo', days: 'all', label: 'Tudo' },
+];
+const STORAGE_KEY = 'dashboard_period_filter';
+
 
 const recommendationConfig = {
   maintain: {
@@ -46,6 +59,17 @@ export default function Today() {
     [alcoholEntries, dailyChecks]
   );
   const weeklyPattern = useMemo(() => getWeeklyPattern(alcoholEntries), [alcoholEntries]);
+
+  const [period, setPeriod] = useState<PeriodKey>(() => {
+    if (typeof window === 'undefined') return '14D';
+    const stored = window.localStorage.getItem(STORAGE_KEY) as PeriodKey | null;
+    return stored && PERIOD_OPTIONS.some(p => p.key === stored) ? stored : '14D';
+  });
+  useEffect(() => {
+    try { window.localStorage.setItem(STORAGE_KEY, period); } catch { /* ignore */ }
+  }, [period]);
+  const activePeriod = PERIOD_OPTIONS.find(p => p.key === period) ?? PERIOD_OPTIONS[0];
+
   
   if (isLoading) {
     return (
@@ -185,7 +209,21 @@ export default function Today() {
       )}
 
       {/* Trend Charts */}
-      <TrendCharts />
+      {/* Period selector for charts */}
+      <div className="flex flex-wrap gap-2 animate-fade-in">
+        {PERIOD_OPTIONS.map(opt => (
+          <Button
+            key={opt.key}
+            variant={period === opt.key ? 'default' : 'secondary'}
+            size="sm"
+            onClick={() => setPeriod(opt.key)}
+          >
+            {opt.key}
+          </Button>
+        ))}
+      </div>
+
+      <TrendCharts period={activePeriod.days} periodLabel={activePeriod.label} />
       
       {/* Load Metrics */}
       <div className="grid grid-cols-3 gap-3">
