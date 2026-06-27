@@ -340,10 +340,10 @@ export function TrendCharts({ period = 14, periodLabel = '14 dias' }: TrendChart
                     );
                   }}
                 />
-                {/* TSB zones (right axis) */}
-                <ReferenceArea yAxisId="tsb" y1={0} y2={tsbMax + 5} fill="hsl(142, 76%, 45%)" fillOpacity={0.06} />
-                <ReferenceArea yAxisId="tsb" y1={-15} y2={0} fill="hsl(45, 93%, 47%)" fillOpacity={0.06} />
-                <ReferenceArea yAxisId="tsb" y1={tsbMin - 5} y2={-15} fill="hsl(0, 72%, 51%)" fillOpacity={0.08} />
+                {/* TSB status zones (right axis) — only inside PMC */}
+                <ReferenceArea yAxisId="tsb" y1={0} y2={tsbMax + 5} fill="hsl(142, 76%, 45%)" fillOpacity={0.10} />
+                <ReferenceArea yAxisId="tsb" y1={-15} y2={0} fill="hsl(45, 93%, 47%)" fillOpacity={0.10} />
+                <ReferenceArea yAxisId="tsb" y1={tsbMin - 5} y2={-15} fill="hsl(0, 72%, 51%)" fillOpacity={0.12} />
                 <ReferenceLine yAxisId="tsb" y={0} stroke="hsl(142, 76%, 45%)" strokeWidth={1} />
                 <ReferenceLine yAxisId="tsb" y={-15} stroke="hsl(0, 72%, 51%)" strokeDasharray="4 4" strokeWidth={1} />
                 <Area
