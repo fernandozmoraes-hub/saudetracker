@@ -392,13 +392,13 @@ export function TrendCharts({ period = 14, periodLabel = '14 dias' }: TrendChart
             </div>
             <div className="flex flex-wrap justify-center gap-3 text-xs text-muted-foreground">
               <span className="flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-status-ok" /> Recuperado: TSB > 0
+                <span className="w-2 h-2 rounded-full bg-status-ok" /> Recuperado: TSB {'>'} 0
               </span>
               <span className="flex items-center gap-1">
                 <span className="w-2 h-2 rounded-full bg-status-alert" /> Construção: TSB entre 0 e -15
               </span>
               <span className="flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-status-critical" /> Sobrecarga: TSB < -15
+                <span className="w-2 h-2 rounded-full bg-status-critical" /> Sobrecarga: TSB {'<'} -15
               </span>
             </div>
           </div>
