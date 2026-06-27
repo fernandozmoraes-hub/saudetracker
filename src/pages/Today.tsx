@@ -1,9 +1,10 @@
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { MetricCard } from '@/components/ui/MetricCard';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 
-import { TrendCharts } from '@/components/TrendCharts';
+import { TrendCharts, TrendPeriod } from '@/components/TrendCharts';
+import { Button } from '@/components/ui/button';
 import { getTodayMetrics } from '@/lib/calculations';
 import { useData } from '@/hooks/useData';
 import { useAlcoholIntake } from '@/hooks/useAlcoholIntake';
@@ -12,6 +13,18 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Heart, TrendingUp, TrendingDown, Activity, AlertTriangle, CheckCircle, PauseCircle, Loader2, Dumbbell, Wine, Brain, ChevronRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
+
+type PeriodKey = '14D' | '30D' | '90D' | '180D' | '1A' | 'Tudo';
+const PERIOD_OPTIONS: { key: PeriodKey; days: TrendPeriod; label: string }[] = [
+  { key: '14D', days: 14, label: '14 dias' },
+  { key: '30D', days: 30, label: '30 dias' },
+  { key: '90D', days: 90, label: '90 dias' },
+  { key: '180D', days: 180, label: '180 dias' },
+  { key: '1A', days: 365, label: '1 ano' },
+  { key: 'Tudo', days: 'all', label: 'Tudo' },
+];
+const STORAGE_KEY = 'dashboard_period_filter';
+
 
 const recommendationConfig = {
   maintain: {
