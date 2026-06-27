@@ -1,26 +1,38 @@
-## Diagnóstico
+## Tarefa
+Adicionar faixas visuais de status no card "PMC — CTL / ATL / TSB" em `src/components/TrendCharts.tsx`, sem alterar cálculos, hooks, banco, Performance Coach ou demais gráficos.
 
-A tabela `public.alcohol_intake` está sem `GRANT` para `authenticated` e `service_role`. Sem isso, o Data API (PostgREST) bloqueia INSERT/SELECT do app mesmo com RLS correta — por isso novos registros não persistem e o Performance Coach lê o histórico vazio (`alcoholTrend: null`).
+## Contexto
+O card PMC unificado já possui `ReferenceArea` para zonas TSB:
+- Verde: TSB > 0
+- Amarela: TSB entre 0 e -15
+- Vermelha: TSB < -15
 
-Confirmado:
-- `information_schema.role_table_grants` para `alcohol_intake` retorna vazio.
-- Policies RLS estão corretas (`auth.uid() = user_id`).
-- Integração no `performanceContext.ts` está OK — depende só dos dados chegarem.
-- `useAlcoholIntake.saveEntry`/`deleteEntry` apenas fazem `console.error` em falha — usuário não vê o erro.
+A alteração consiste em:
+1. Ajustar a opacidade das faixas existentes para melhor legibilidade (mantendo-as sutis).
+2. Adicionar uma legenda discreta abaixo do gráfico com:
+   - 🟢 Recuperado: TSB > 0
+   - 🟡 Construção: TSB entre 0 e -15
+   - 🔴 Sobrecarga: TSB < -15
 
-## Correção
+## Escopo
+- Arquivo único: `src/components/TrendCharts.tsx`
+- Componente afetado: card PMC (linhas ~287–393)
+- Não alterar: HRV, CTL/ATL separado, TSB separado, cálculos, hooks, banco, Performance Coach, seletor de período, downsampling
 
-### 1. Migração — restaurar GRANTs
-```sql
-GRANT SELECT, INSERT, UPDATE, DELETE ON public.alcohol_intake TO authenticated;
-GRANT ALL ON public.alcohol_intake TO service_role;
-```
+## Implementação
 
-### 2. `src/hooks/useAlcoholIntake.tsx` — feedback de erro
-- Importar `toast` de `sonner`.
-- Em `saveEntry` e `deleteEntry`, ao receber `error`, disparar `toast.error(error.message)` além do `console.error`.
+### Ajuste visual das faixas
+- Revisar os `fillOpacity` dos três `ReferenceArea` do TSB no `ComposedChart` do PMC.
+- Aumentar levemente a opacidade para garantir que as zonas sejam perceptíveis sem prejudicar a leitura das linhas CTL/ATL.
+- Usar cores dos tokens de status existentes (`status-ok`, `status-alert`, `status-critical`) via HSL para manter consistência com tema.
 
-## Garantias
-- Mexe apenas em permissões da tabela `alcohol_intake` e no hook que a consome.
-- Não altera schema, RLS, cálculos, Performance Coach, edge functions ou demais módulos.
-- Dados existentes preservados.
+### Legenda discreta
+- Inserir abaixo do gráfico, logo após a legenda existente CTL/ATL/TSB.
+- Layout: linha flexível, centralizada, gap-4, texto `text-xs text-muted-foreground`.
+- Cada item com um pequeno círculo colorido (w-2 h-2 rounded-full) e o rótulo correspondente.
+
+### Checklist
+- [ ] Faixas visuais ajustadas no PMC (apenas).
+- [ ] Legenda de status TSB adicionada abaixo do gráfico PMC.
+- [ ] Tooltip, legenda CTL/ATL/TSB, dois eixos Y, seletor de período e downsampling mantidos.
+- [ ] Nenhum cálculo ou dado alterado.
