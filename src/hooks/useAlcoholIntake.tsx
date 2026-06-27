@@ -92,6 +92,7 @@ export function useAlcoholIntake() {
 
     if (error) {
       console.error('Error deleting alcohol intake:', error);
+      toast.error(`Falha ao remover registro: ${error.message}`);
       return false;
     }
 
