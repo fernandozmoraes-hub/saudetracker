@@ -1,4 +1,4 @@
-import { LineChart, Line, AreaChart, Area, XAxis, YAxis, ReferenceLine, ResponsiveContainer, Tooltip } from 'recharts';
+import { LineChart, Line, AreaChart, Area, ComposedChart, XAxis, YAxis, ReferenceLine, ReferenceArea, ResponsiveContainer, Tooltip } from 'recharts';
 import { getTrendData, DailyTrendData } from '@/lib/calculations';
 import { useData } from '@/hooks/useData';
 import { Heart, TrendingUp, Activity } from 'lucide-react';
