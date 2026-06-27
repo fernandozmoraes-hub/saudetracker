@@ -209,7 +209,21 @@ export default function Today() {
       )}
 
       {/* Trend Charts */}
-      <TrendCharts />
+      {/* Period selector for charts */}
+      <div className="flex flex-wrap gap-2 animate-fade-in">
+        {PERIOD_OPTIONS.map(opt => (
+          <Button
+            key={opt.key}
+            variant={period === opt.key ? 'default' : 'secondary'}
+            size="sm"
+            onClick={() => setPeriod(opt.key)}
+          >
+            {opt.key}
+          </Button>
+        ))}
+      </div>
+
+      <TrendCharts period={activePeriod.days} periodLabel={activePeriod.label} />
       
       {/* Load Metrics */}
       <div className="grid grid-cols-3 gap-3">
