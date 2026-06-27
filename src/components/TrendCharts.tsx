@@ -1,4 +1,4 @@
-import { LineChart, Line, AreaChart, Area, XAxis, YAxis, ReferenceLine, ResponsiveContainer, Tooltip } from 'recharts';
+import { LineChart, Line, AreaChart, Area, ComposedChart, XAxis, YAxis, ReferenceLine, ReferenceArea, ResponsiveContainer, Tooltip } from 'recharts';
 import { getTrendData, DailyTrendData } from '@/lib/calculations';
 import { useData } from '@/hooks/useData';
 import { Heart, TrendingUp, Activity } from 'lucide-react';
@@ -283,6 +283,115 @@ export function TrendCharts({ period = 14, periodLabel = '14 dias' }: TrendChart
           </div>
         )}
       </div>
+
+      {/* PMC — CTL / ATL / TSB unified chart */}
+      <div className="gradient-card rounded-xl p-4 border border-border/50">
+        <div className="flex items-center gap-2 mb-3">
+          <Activity className="w-4 h-4 text-primary" />
+          <span className="text-sm font-semibold">PMC — CTL / ATL / TSB - {periodLabel}</span>
+        </div>
+        {!hasAnyData ? <EmptyState /> : (
+          <div className="h-56">
+            <ResponsiveContainer width="100%" height="100%">
+              <ComposedChart data={data} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="pmcTsbGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="hsl(142, 76%, 45%)" stopOpacity={0.3} />
+                    <stop offset="50%" stopColor="hsl(45, 93%, 47%)" stopOpacity={0.15} />
+                    <stop offset="100%" stopColor="hsl(0, 72%, 51%)" stopOpacity={0.25} />
+                  </linearGradient>
+                </defs>
+                <XAxis
+                  dataKey="date"
+                  tick={{ fontSize: 10, fill: 'hsl(215, 20%, 55%)' }}
+                  axisLine={{ stroke: 'hsl(222, 30%, 20%)' }}
+                  tickLine={false}
+                  interval="preserveStartEnd"
+                  minTickGap={20}
+                />
+                <YAxis
+                  yAxisId="load"
+                  tick={{ fontSize: 10, fill: 'hsl(215, 20%, 55%)' }}
+                  axisLine={false}
+                  tickLine={false}
+                  domain={[Math.max(0, ctlAtlMin - 5), ctlAtlMax + 5]}
+                />
+                <YAxis
+                  yAxisId="tsb"
+                  orientation="right"
+                  tick={{ fontSize: 10, fill: 'hsl(215, 20%, 55%)' }}
+                  axisLine={false}
+                  tickLine={false}
+                  domain={[tsbMin - 5, tsbMax + 5]}
+                />
+                <Tooltip
+                  content={({ active, payload, label }: any) => {
+                    if (!active || !payload?.length) return null;
+                    const p = payload[0].payload;
+                    return (
+                      <div className="bg-card border border-border rounded-lg px-3 py-2 shadow-lg">
+                        <p className="text-xs text-muted-foreground">{label}</p>
+                        <p className="text-sm font-semibold text-primary">CTL: {p.ctl}</p>
+                        <p className="text-sm font-semibold text-status-alert">ATL: {p.atl}</p>
+                        <p className="text-sm font-semibold">
+                          TSB: <span className={p.tsb >= 0 ? 'text-status-ok' : p.tsb >= -15 ? 'text-status-alert' : 'text-status-critical'}>{p.tsb}</span>
+                        </p>
+                      </div>
+                    );
+                  }}
+                />
+                {/* TSB zones (right axis) */}
+                <ReferenceArea yAxisId="tsb" y1={0} y2={tsbMax + 5} fill="hsl(142, 76%, 45%)" fillOpacity={0.06} />
+                <ReferenceArea yAxisId="tsb" y1={-15} y2={0} fill="hsl(45, 93%, 47%)" fillOpacity={0.06} />
+                <ReferenceArea yAxisId="tsb" y1={tsbMin - 5} y2={-15} fill="hsl(0, 72%, 51%)" fillOpacity={0.08} />
+                <ReferenceLine yAxisId="tsb" y={0} stroke="hsl(142, 76%, 45%)" strokeWidth={1} />
+                <ReferenceLine yAxisId="tsb" y={-15} stroke="hsl(0, 72%, 51%)" strokeDasharray="4 4" strokeWidth={1} />
+                <Area
+                  yAxisId="tsb"
+                  type="monotone"
+                  dataKey="tsb"
+                  name="TSB"
+                  stroke="hsl(174, 72%, 56%)"
+                  strokeWidth={1.5}
+                  fill="url(#pmcTsbGradient)"
+                />
+                <Line
+                  yAxisId="load"
+                  type="monotone"
+                  dataKey="ctl"
+                  name="CTL"
+                  stroke="hsl(174, 72%, 56%)"
+                  strokeWidth={2}
+                  dot={false}
+                />
+                <Line
+                  yAxisId="load"
+                  type="monotone"
+                  dataKey="atl"
+                  name="ATL"
+                  stroke="hsl(45, 93%, 47%)"
+                  strokeWidth={2}
+                  dot={false}
+                />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+        {hasAnyData && (
+          <div className="flex flex-wrap justify-center gap-4 text-xs text-muted-foreground mt-2">
+            <span className="flex items-center gap-1">
+              <span className="w-3 h-0.5 bg-primary rounded" /> CTL (Fitness)
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="w-3 h-0.5 bg-status-alert rounded" /> ATL (Fadiga)
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="w-3 h-2 rounded" style={{ background: 'linear-gradient(180deg, hsl(142,76%,45%,0.5), hsl(0,72%,51%,0.5))' }} /> TSB (Form, eixo dir.)
+            </span>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
+
