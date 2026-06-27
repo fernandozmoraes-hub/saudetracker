@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
 import { format, subDays } from 'date-fns';
 import { calculateAlcoholGrams, getDailyTotal } from '@/lib/alcoholCalcs';
+import { toast } from 'sonner';
 
 export function useAlcoholIntake() {
   const { user } = useAuth();
