@@ -378,16 +378,29 @@ export function TrendCharts({ period = 14, periodLabel = '14 dias' }: TrendChart
           </div>
         )}
         {hasAnyData && (
-          <div className="flex flex-wrap justify-center gap-4 text-xs text-muted-foreground mt-2">
-            <span className="flex items-center gap-1">
-              <span className="w-3 h-0.5 bg-primary rounded" /> CTL (Fitness)
-            </span>
-            <span className="flex items-center gap-1">
-              <span className="w-3 h-0.5 bg-status-alert rounded" /> ATL (Fadiga)
-            </span>
-            <span className="flex items-center gap-1">
-              <span className="w-3 h-2 rounded" style={{ background: 'linear-gradient(180deg, hsl(142,76%,45%,0.5), hsl(0,72%,51%,0.5))' }} /> TSB (Form, eixo dir.)
-            </span>
+          <div className="space-y-2 mt-2">
+            <div className="flex flex-wrap justify-center gap-4 text-xs text-muted-foreground">
+              <span className="flex items-center gap-1">
+                <span className="w-3 h-0.5 bg-primary rounded" /> CTL (Fitness)
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="w-3 h-0.5 bg-status-alert rounded" /> ATL (Fadiga)
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="w-3 h-2 rounded" style={{ background: 'linear-gradient(180deg, hsl(142,76%,45%,0.5), hsl(0,72%,51%,0.5))' }} /> TSB (Form, eixo dir.)
+              </span>
+            </div>
+            <div className="flex flex-wrap justify-center gap-3 text-xs text-muted-foreground">
+              <span className="flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-status-ok" /> Recuperado: TSB > 0
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-status-alert" /> Construção: TSB entre 0 e -15
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-status-critical" /> Sobrecarga: TSB < -15
+              </span>
+            </div>
           </div>
         )}
       </div>
