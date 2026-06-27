@@ -55,6 +55,7 @@ export default {
           ok: "hsl(var(--status-ok))",
           alert: "hsl(var(--status-alert))",
           critical: "hsl(var(--status-critical))",
+          trainable: "hsl(var(--status-trainable))",
         },
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",

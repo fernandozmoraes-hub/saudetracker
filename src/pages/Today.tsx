@@ -2,6 +2,7 @@ import { useMemo, useState, useEffect } from 'react';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { MetricCard } from '@/components/ui/MetricCard';
 import { StatusBadge } from '@/components/ui/StatusBadge';
+import { LoadStatusCard } from '@/components/ui/LoadStatusCard';
 
 import { TrendCharts, TrendPeriod } from '@/components/TrendCharts';
 import { Button } from '@/components/ui/button';
@@ -226,7 +227,7 @@ export default function Today() {
       <TrendCharts period={activePeriod.days} periodLabel={activePeriod.label} />
       
       {/* Load Metrics */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <MetricCard
           label="CTL"
           value={metrics.ctl}
@@ -248,6 +249,7 @@ export default function Today() {
                 : 'text-status-ok'
           }
         />
+        <LoadStatusCard tsb={metrics.tsb} />
       </div>
       
       {/* Active Model Banner */}
