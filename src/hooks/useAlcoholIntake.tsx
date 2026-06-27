@@ -73,6 +73,7 @@ export function useAlcoholIntake() {
 
     if (error) {
       console.error('Error saving alcohol intake:', error);
+      toast.error(`Falha ao salvar registro: ${error.message}`);
       return false;
     }
 
