@@ -230,17 +230,17 @@ export default function Today() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <MetricCard
           label="CTL"
-          value={metrics.ctl}
+          value={metrics.ctl.toFixed(1)}
           icon={<TrendingUp className="w-4 h-4" />}
         />
         <MetricCard
           label="ATL"
-          value={metrics.atl}
+          value={metrics.atl.toFixed(1)}
           icon={<Activity className="w-4 h-4" />}
         />
         <MetricCard
           label="TSB"
-          value={metrics.tsb}
+          value={metrics.tsb.toFixed(1)}
           valueClassName={
             metrics.tsb < -15 
               ? 'text-status-critical' 
