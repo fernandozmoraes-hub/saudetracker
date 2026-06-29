@@ -345,7 +345,7 @@ export function calculateCTL(date: string, workouts: Workout[]): number {
     ctl = alpha * tss + (1 - alpha) * ctl;
   }
   
-  return Math.round(ctl);
+  return Math.round(ctl * 10) / 10;
 }
 
 export function getTodayMetrics(dailyChecks: DailyCheck[], workouts: Workout[]): TodayMetrics {
