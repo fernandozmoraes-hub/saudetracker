@@ -3,6 +3,7 @@ import { format, eachDayOfInterval } from 'date-fns';
 import { getDailyTssEffective, calculateATL, calculateCTL } from '@/lib/calculations';
 import { TrendingUp, TrendingDown, Activity, Target, BarChart3 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { formatMetric } from '@/lib/formatMetric';
 
 interface WeeklySummaryProps {
   weekStart: Date;
@@ -70,19 +71,19 @@ export function WeeklySummary({ weekStart, weekEnd, workouts }: WeeklySummaryPro
       <div className="grid grid-cols-3 gap-3">
         <div className="text-center p-3 bg-muted/50 rounded-lg">
           <div className="text-xs text-muted-foreground mb-1">CTL</div>
-          <div className="text-xl font-bold text-foreground">{ctl}</div>
+          <div className="text-xl font-bold text-foreground">{formatMetric(ctl)}</div>
           <div className="text-[10px] text-muted-foreground">Fitness</div>
         </div>
         <div className="text-center p-3 bg-muted/50 rounded-lg">
           <div className="text-xs text-muted-foreground mb-1">ATL</div>
-          <div className="text-xl font-bold text-foreground">{atl}</div>
+          <div className="text-xl font-bold text-foreground">{formatMetric(atl)}</div>
           <div className="text-[10px] text-muted-foreground">Fatigue</div>
         </div>
         <div className="text-center p-3 bg-muted/50 rounded-lg">
           <div className="text-xs text-muted-foreground mb-1">TSB</div>
           <div className={cn("text-xl font-bold flex items-center justify-center gap-1", tsbStatus.color)}>
             {tsb > 0 ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
-            {tsb}
+            {formatMetric(tsb)}
           </div>
           <div className="text-[10px] text-muted-foreground">{tsbStatus.label}</div>
         </div>

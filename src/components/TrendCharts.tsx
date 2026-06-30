@@ -1,6 +1,7 @@
 import { LineChart, Line, AreaChart, Area, ComposedChart, XAxis, YAxis, ReferenceLine, ReferenceArea, ResponsiveContainer, Tooltip } from 'recharts';
 import { getTrendData, DailyTrendData } from '@/lib/calculations';
 import { useData } from '@/hooks/useData';
+import { formatMetric } from '@/lib/formatMetric';
 import { Heart, TrendingUp, Activity } from 'lucide-react';
 
 export type TrendPeriod = number | 'all';
@@ -69,7 +70,7 @@ export function TrendCharts({ period = 14, periodLabel = '14 dias' }: TrendChart
       return (
         <div className="bg-card border border-border rounded-lg px-3 py-2 shadow-lg">
           <p className="text-xs text-muted-foreground">{label}</p>
-          <p className="text-sm font-semibold">TSB: {tsb}</p>
+          <p className="text-sm font-semibold">TSB: {formatMetric(tsb)}</p>
           <p className="text-xs text-muted-foreground">{status}</p>
         </div>
       );
@@ -84,8 +85,8 @@ export function TrendCharts({ period = 14, periodLabel = '14 dias' }: TrendChart
       return (
         <div className="bg-card border border-border rounded-lg px-3 py-2 shadow-lg">
           <p className="text-xs text-muted-foreground">{label}</p>
-          <p className="text-sm font-semibold text-primary">CTL: {ctl}</p>
-          <p className="text-sm font-semibold text-status-alert">ATL: {atl}</p>
+          <p className="text-sm font-semibold text-primary">CTL: {formatMetric(ctl)}</p>
+          <p className="text-sm font-semibold text-status-alert">ATL: {formatMetric(atl)}</p>
         </div>
       );
     }
@@ -331,10 +332,10 @@ export function TrendCharts({ period = 14, periodLabel = '14 dias' }: TrendChart
                     return (
                       <div className="bg-card border border-border rounded-lg px-3 py-2 shadow-lg">
                         <p className="text-xs text-muted-foreground">{label}</p>
-                        <p className="text-sm font-semibold text-primary">CTL: {p.ctl}</p>
-                        <p className="text-sm font-semibold text-status-alert">ATL: {p.atl}</p>
+                        <p className="text-sm font-semibold text-primary">CTL: {formatMetric(p.ctl)}</p>
+                        <p className="text-sm font-semibold text-status-alert">ATL: {formatMetric(p.atl)}</p>
                         <p className="text-sm font-semibold">
-                          TSB: <span className={p.tsb >= 0 ? 'text-status-ok' : p.tsb >= -15 ? 'text-status-alert' : 'text-status-critical'}>{p.tsb}</span>
+                          TSB: <span className={p.tsb >= 0 ? 'text-status-ok' : p.tsb >= -15 ? 'text-status-alert' : 'text-status-critical'}>{formatMetric(p.tsb)}</span>
                         </p>
                       </div>
                     );
