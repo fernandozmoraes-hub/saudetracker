@@ -7,6 +7,7 @@ import { LoadStatusCard } from '@/components/ui/LoadStatusCard';
 import { TrendCharts, TrendPeriod } from '@/components/TrendCharts';
 import { Button } from '@/components/ui/button';
 import { getTodayMetrics } from '@/lib/calculations';
+import { formatMetric } from '@/lib/formatMetric';
 import { useData } from '@/hooks/useData';
 import { useAlcoholIntake } from '@/hooks/useAlcoholIntake';
 import { getAlcoholHRVCorrelation, getCorrelationColor, getCorrelationBgColor, getWeeklyPattern, getWeeklyPatternColor, getTrendArrow } from '@/lib/alcoholCalcs';
@@ -230,17 +231,17 @@ export default function Today() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <MetricCard
           label="CTL"
-          value={metrics.ctl.toFixed(1)}
+          value={formatMetric(metrics.ctl)}
           icon={<TrendingUp className="w-4 h-4" />}
         />
         <MetricCard
           label="ATL"
-          value={metrics.atl.toFixed(1)}
+          value={formatMetric(metrics.atl)}
           icon={<Activity className="w-4 h-4" />}
         />
         <MetricCard
           label="TSB"
-          value={metrics.tsb.toFixed(1)}
+          value={formatMetric(metrics.tsb)}
           valueClassName={
             metrics.tsb < -15 
               ? 'text-status-critical' 
