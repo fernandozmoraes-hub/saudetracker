@@ -1,38 +1,40 @@
-## Tarefa
-Adicionar faixas visuais de status no card "PMC — CTL / ATL / TSB" em `src/components/TrendCharts.tsx`, sem alterar cálculos, hooks, banco, Performance Coach ou demais gráficos.
+## Objetivo
+Eliminar exibições com precisão excessiva (ex.: `3.199999999999999`) padronizando formatação numérica via helper compartilhado.
 
-## Contexto
-O card PMC unificado já possui `ReferenceArea` para zonas TSB:
-- Verde: TSB > 0
-- Amarela: TSB entre 0 e -15
-- Vermelha: TSB < -15
+## Causa raiz
+No `WeeklySummary.tsx` (Calendário), TSB é calculado inline como `ctl - atl` e renderizado direto (`{tsb}`), sem `toFixed`. CTL/ATL vêm de `calculations.ts` já arredondados para 1 casa, mas a subtração reintroduz o erro de ponto flutuante.
 
-A alteração consiste em:
-1. Ajustar a opacidade das faixas existentes para melhor legibilidade (mantendo-as sutis).
-2. Adicionar uma legenda discreta abaixo do gráfico com:
-   - 🟢 Recuperado: TSB > 0
-   - 🟡 Construção: TSB entre 0 e -15
-   - 🔴 Sobrecarga: TSB < -15
+## Mudanças
 
-## Escopo
-- Arquivo único: `src/components/TrendCharts.tsx`
-- Componente afetado: card PMC (linhas ~287–393)
-- Não alterar: HRV, CTL/ATL separado, TSB separado, cálculos, hooks, banco, Performance Coach, seletor de período, downsampling
+### 1. Criar helper compartilhado
+Novo arquivo `src/lib/formatMetric.ts`:
+```ts
+export function formatMetric(value: number | null | undefined, decimals = 1): string {
+  if (value == null || !Number.isFinite(value)) return "0.0";
+  return Number(value).toFixed(decimals);
+}
+```
 
-## Implementação
+### 2. Corrigir Calendário (bug reportado)
+`src/components/calendar/WeeklySummary.tsx`:
+- Importar `formatMetric`.
+- Exibir CTL, ATL e TSB com `formatMetric(...)` (1 casa).
+- Manter lógica de status TSB (`getTsbStatus`) e ícone de tendência inalterados.
 
-### Ajuste visual das faixas
-- Revisar os `fillOpacity` dos três `ReferenceArea` do TSB no `ComposedChart` do PMC.
-- Aumentar levemente a opacidade para garantir que as zonas sejam perceptíveis sem prejudicar a leitura das linhas CTL/ATL.
-- Usar cores dos tokens de status existentes (`status-ok`, `status-alert`, `status-critical`) via HSL para manter consistência com tema.
+### 3. Varredura e padronização (escopo controlado)
+Aplicar `formatMetric` apenas onde há risco real de float drift ou inconsistência de casas decimais nos indicadores de carga/recuperação:
 
-### Legenda discreta
-- Inserir abaixo do gráfico, logo após a legenda existente CTL/ATL/TSB.
-- Layout: linha flexível, centralizada, gap-4, texto `text-xs text-muted-foreground`.
-- Cada item com um pequeno círculo colorido (w-2 h-2 rounded-full) e o rótulo correspondente.
+- `src/pages/Today.tsx` — cards CTL/ATL/TSB (já usam `toFixed(1)`, trocar por `formatMetric` para consistência).
+- `src/components/ui/LoadStatusCard.tsx` — valor TSB exibido.
+- `src/components/TrendCharts.tsx` — tooltips/labels de CTL/ATL/TSB no PMC.
+- `src/components/calendar/DayMetricsCard.tsx` — se exibir HRV/métricas derivadas.
 
-### Checklist
-- [ ] Faixas visuais ajustadas no PMC (apenas).
-- [ ] Legenda de status TSB adicionada abaixo do gráfico PMC.
-- [ ] Tooltip, legenda CTL/ATL/TSB, dois eixos Y, seletor de período e downsampling mantidos.
-- [ ] Nenhum cálculo ou dado alterado.
+### 4. Fora de escopo
+- Não alterar fórmulas (`calculateATL`, `calculateCTL`, TSS).
+- Não tocar em distância (`toFixed(1)` já consistente), duração (inteiros), Performance Coach, banco, edge functions, gráficos (eixos), ou PDFs.
+- TSS continua exibido como inteiro (`Math.round`), conforme padrão atual.
+
+## Validação
+- Abrir `/calendar` em semana com CTL=11.2 / ATL=8.0 → TSB deve mostrar `3.2`.
+- `bun run build` + `tsgo` limpos.
+- Screenshot Playwright do card "Resumo da Semana" confirmando os 3 valores com 1 casa decimal.
