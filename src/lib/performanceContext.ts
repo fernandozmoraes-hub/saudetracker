@@ -76,6 +76,16 @@ export interface Last30DaysSection {
   alcoholTrend: { slopePerWeek: number; samples: number } | null;
 }
 
+export type TrendUnavailableReason =
+  | 'no_recent_data'
+  | 'insufficient_entries'
+  | 'insufficient_span'
+  | 'not_computable';
+
+export type TrendValue =
+  | { absoluteChange: number; percentChange: number }
+  | { available: false; reason: TrendUnavailableReason };
+
 export interface BodyCompositionSection {
   available: true;
   latest: {
@@ -90,9 +100,12 @@ export interface BodyCompositionSection {
     bodyFatPct: number | null;
   };
   trend30d: {
-    weight: { absoluteChange: number; percentChange: number } | null;
-    muscle: { absoluteChange: number; percentChange: number } | null;
-    bodyFat: { absoluteChange: number; percentChange: number } | null;
+    weight: TrendValue;
+    muscle: TrendValue;
+    bodyFat: TrendValue;
+    windowDays: number;
+    entriesInWindow: number;
+    spanDays: number;
   };
   totalEntries: number;
 }
@@ -344,10 +357,19 @@ function buildBodyComposition(
     : 0;
   const trendEligible = last30.length >= 2 && span >= 14;
 
-  const trendFor = (field: 'weightKg' | 'muscleMassKg' | 'bodyFatPct') => {
-    if (!trendEligible) return null;
+  const unavailableReason: TrendUnavailableReason =
+    last30.length === 0
+      ? 'no_recent_data'
+      : last30.length < 2
+      ? 'insufficient_entries'
+      : span < 14
+      ? 'insufficient_span'
+      : 'not_computable';
+
+  const trendFor = (field: 'weightKg' | 'muscleMassKg' | 'bodyFatPct'): TrendValue => {
+    if (!trendEligible) return { available: false, reason: unavailableReason };
     const t = calculateTrend30d(consistent, field);
-    if (!t) return null;
+    if (!t) return { available: false, reason: 'not_computable' };
     return {
       absoluteChange: Math.round(t.absoluteChange * 100) / 100,
       percentChange: Math.round(t.percentChange * 100) / 100,
@@ -376,6 +398,9 @@ function buildBodyComposition(
       weight: trendFor('weightKg'),
       muscle: trendFor('muscleMassKg'),
       bodyFat: trendFor('bodyFatPct'),
+      windowDays: 30,
+      entriesInWindow: last30.length,
+      spanDays: span,
     },
     totalEntries: consistent.length,
   };
