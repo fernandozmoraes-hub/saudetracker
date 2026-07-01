@@ -25,7 +25,19 @@ export type SectionKey =
   | 'last30Days'
   | 'bodyComposition'
   | 'recentWorkouts'
-  | 'equipment';
+  | 'equipment'
+  | 'alcohol'
+  | 'alcoholTrend';
+
+export interface CoverageInfo {
+  status: 'available' | 'unavailable';
+  reason?: string;
+  entries?: number;
+  spanDays?: number;
+  sampleSize?: number;
+  eventCount?: number;
+  daysWithIntake?: number;
+}
 
 export interface SectionUnavailable {
   available: false;
