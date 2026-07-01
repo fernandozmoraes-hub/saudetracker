@@ -106,6 +106,39 @@ serve(async (req) => {
 
     const { performanceContext, messages, question, intent, sectionsUsed } = parseResult.data;
 
+    // ── Log seguro: apenas presença/ausência e contagens ───────────────
+    try {
+      const keys = ['today','last7Days','last30Days','bodyComposition','recentWorkouts','equipment','alcohol','alcoholTrend'];
+      const summary: Record<string, string> = {};
+      for (const k of keys) {
+        const v: any = (performanceContext as any)?.[k];
+        if (Array.isArray(v)) {
+          summary[k] = v.length > 0 ? `present(items=${v.length})` : 'empty';
+        } else if (v && typeof v === 'object') {
+          if (v.available === true) {
+            const extra: string[] = [];
+            if (k === 'bodyComposition' && v.trend30d) {
+              extra.push(`entries=${v.trend30d.entriesInWindow}`, `spanDays=${v.trend30d.spanDays}`);
+            }
+            if (k === 'alcohol' && v.last30Days) {
+              extra.push(`events30=${v.last30Days.eventCount}`, `days30=${v.last30Days.daysWithIntake}`);
+            }
+            if (k === 'alcoholTrend' && v.hrvImpact) {
+              extra.push(`hrvImpact=${v.hrvImpact.available ? `r=${v.hrvImpact.r},n=${v.hrvImpact.sampleSize}` : `unavailable(${v.hrvImpact.reason})`}`);
+            }
+            summary[k] = `present${extra.length ? '(' + extra.join(',') + ')' : ''}`;
+          } else {
+            summary[k] = `missing(${v.reason ?? 'unknown'})`;
+          }
+        } else {
+          summary[k] = 'missing';
+        }
+      }
+      console.log('[performance-coach] intent=', intent ?? 'general', 'sectionsUsed=', sectionsUsed ?? [], 'ctxKeys=', summary);
+    } catch (e) {
+      console.log('[performance-coach] logging error', (e as Error).message);
+    }
+
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {
       return new Response(
