@@ -141,15 +141,44 @@ export interface EquipmentItem {
   status: string;
 }
 
+export interface AlcoholSection {
+  available: true;
+  last7Days: {
+    totalGrams: number;
+    daysWithIntake: number;
+    eventCount: number;
+  };
+  last30Days: {
+    totalGrams: number;
+    daysWithIntake: number;
+    eventCount: number;
+    weeklyAvgGrams: number;
+  };
+  lastEventDate: string | null;
+}
+
+export interface AlcoholTrendSection {
+  available: true;
+  hrvImpact:
+    | { available: true; r: number; classification: string; label: string; sampleSize: number }
+    | { available: false; reason: 'insufficient_pairs' | 'no_data' };
+  weeklyPattern:
+    | { available: true; pattern: string; avgWeekly: number; trend: 'up' | 'down' | 'stable'; weeklyTotals: number[] }
+    | { available: false; reason: 'insufficient_samples' };
+}
+
 export interface PerformanceContext {
   generatedAt: string;
-  dataCoverage: Record<SectionKey, 'available' | 'unavailable'>;
+  dataCoverage: Record<SectionKey, CoverageInfo>;
   today: TodaySection | SectionUnavailable;
   last7Days: Last7DaysSection | SectionUnavailable;
   last30Days: Last30DaysSection | SectionUnavailable;
   bodyComposition: BodyCompositionSection | SectionUnavailable;
   recentWorkouts: RecentWorkoutItem[];
   equipment: EquipmentItem[];
+  alcohol: AlcoholSection | SectionUnavailable;
+  alcoholTrend: AlcoholTrendSection | SectionUnavailable;
+  /** @deprecated mantido por compatibilidade — use `alcohol` e `alcoholTrend`. */
   alcoholCorrelation: {
     available: boolean;
     r?: number;
