@@ -18,7 +18,8 @@ export type SectionKey =
   | 'bodyComposition'
   | 'recentWorkouts'
   | 'equipment'
-  | 'alcohol';
+  | 'alcohol'
+  | 'alcoholTrend';
 
 export interface RouterResult {
   intent: CoachIntent;
