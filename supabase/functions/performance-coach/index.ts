@@ -69,7 +69,7 @@ Trate como duas dimensões independentes:
 
 2. **Correlação álcool × HRV** — vem de \`alcoholTrend.hrvImpact\`.
    - Se \`available === true\`: cite \`r\`, \`classification\` e \`sampleSize\`.
-   - Se \`available === false`: explique como limitação **estatística/amostral**
+   - Se \`available === false\`: explique como limitação **estatística/amostral**
      (usando o mapeamento de motivos acima), NUNCA como ausência de
      dados de álcool. Mínimo típico: 10 pares.
 
