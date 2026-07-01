@@ -18,7 +18,8 @@ export type SectionKey =
   | 'bodyComposition'
   | 'recentWorkouts'
   | 'equipment'
-  | 'alcohol';
+  | 'alcohol'
+  | 'alcoholTrend';
 
 export interface RouterResult {
   intent: CoachIntent;
@@ -112,19 +113,19 @@ const SECTIONS_BY_INTENT: Record<
   { required: SectionKey[]; optional: SectionKey[] }
 > = {
   recovery: {
-    required: ['today', 'last7Days', 'last30Days'],
-    optional: ['alcohol'],
+    required: ['today', 'last7Days', 'last30Days', 'bodyComposition', 'alcohol', 'alcoholTrend'],
+    optional: [],
   },
   training_load: {
     required: ['today', 'last7Days', 'last30Days', 'recentWorkouts'],
-    optional: [],
+    optional: ['alcohol'],
   },
   body_composition: {
     required: ['bodyComposition', 'last30Days', 'recentWorkouts'],
-    optional: [],
+    optional: ['alcohol'],
   },
   alcohol_impact: {
-    required: ['alcohol', 'today', 'last7Days', 'last30Days'],
+    required: ['alcohol', 'alcoholTrend', 'today', 'last7Days', 'last30Days'],
     optional: [],
   },
   equipment: {
@@ -132,7 +133,7 @@ const SECTIONS_BY_INTENT: Record<
     optional: [],
   },
   progress: {
-    required: ['today', 'last30Days', 'bodyComposition', 'recentWorkouts'],
+    required: ['today', 'last30Days', 'bodyComposition', 'recentWorkouts', 'alcohol', 'alcoholTrend'],
     optional: ['last7Days'],
   },
   general: {
@@ -144,6 +145,7 @@ const SECTIONS_BY_INTENT: Record<
       'recentWorkouts',
       'equipment',
       'alcohol',
+      'alcoholTrend',
     ],
     optional: [],
   },
@@ -192,7 +194,9 @@ export function routePerformanceQuestion(question: string): RouterResult {
 
 // Filtra o PerformanceContext mantendo apenas as seções relevantes.
 // Seções fora do escopo viram { available: false, reason: 'not_relevant' }
-// — assim o prompt fica enxuto e a IA sabe que aquilo NÃO deve ser usado.
+// — o dataCoverage do PerformanceContext (objeto enriquecido) é preservado
+// para que o coach saiba, ex.: quantos registros existem mesmo quando a
+// tendência calculada está indisponível.
 export function filterPerformanceContext(
   ctx: Record<string, any>,
   required: SectionKey[],
@@ -207,26 +211,37 @@ export function filterPerformanceContext(
     'recentWorkouts',
     'equipment',
     'alcohol',
+    'alcoholTrend',
   ];
+
+  // Copia o dataCoverage original preservando os objetos enriquecidos.
+  const sourceCoverage = (ctx.dataCoverage ?? {}) as Record<string, any>;
+  const dataCoverage: Record<string, any> = {};
+  for (const key of allSections) {
+    const src = sourceCoverage[key];
+    if (src && typeof src === 'object') {
+      dataCoverage[key] = { ...src, includedByRouter: allow.has(key) };
+    } else {
+      dataCoverage[key] = { status: 'unavailable', includedByRouter: allow.has(key) };
+    }
+  }
 
   const filtered: Record<string, any> = {
     generatedAt: ctx.generatedAt,
-    dataCoverage: { ...(ctx.dataCoverage ?? {}) },
+    dataCoverage,
   };
 
   const included: SectionKey[] = [];
   for (const key of allSections) {
-    if (allow.has(key) && ctx[key]) {
+    // recentWorkouts/equipment são arrays, não têm .available
+    const isArraySection = Array.isArray(ctx[key]);
+    const hasData = isArraySection ? ctx[key].length > 0 : ctx[key]?.available !== false;
+
+    if (allow.has(key) && ctx[key] !== undefined) {
       filtered[key] = ctx[key];
-      if (ctx[key]?.available !== false) {
-        included.push(key);
-        filtered.dataCoverage[key] = true;
-      } else {
-        filtered.dataCoverage[key] = false;
-      }
+      if (hasData) included.push(key);
     } else {
       filtered[key] = { available: false, reason: 'not_relevant' };
-      filtered.dataCoverage[key] = false;
     }
   }
 
@@ -241,6 +256,7 @@ export const SECTION_LABELS: Record<SectionKey, string> = {
   recentWorkouts: 'Treinos recentes',
   equipment: 'Equipamentos',
   alcohol: 'Álcool',
+  alcoholTrend: 'Tendência de álcool',
 };
 
 export const INTENT_LABELS: Record<CoachIntent, string> = Object.fromEntries(

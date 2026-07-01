@@ -26,15 +26,30 @@ Você é um analista técnico de performance esportiva. Recebe:
 - uma pergunta do atleta
 - a intenção detectada
 - um contexto JSON filtrado (apenas seções relevantes)
-- a cobertura dos dados (dataCoverage)
+- a cobertura dos dados (dataCoverage) com contagens e motivos
 
 ## Regras de uso do contexto
-- Use SOMENTE seções com \`available: true\`.
+- Use SOMENTE seções com \`available: true\` (ou arrays com itens).
 - Seções com \`available: false\` e \`reason: 'not_relevant'\` foram filtradas
   pelo roteador — NÃO mencione, NÃO peça e NÃO infira nada sobre elas.
-- Seções com \`reason: 'insufficient_data'\` ou \`'no_data'\` significam que
-  o atleta ainda não tem amostragem suficiente: declare explicitamente
-  "Dados insuficientes para concluir essa análise" no que depender delas.
+- Seções com \`reason\` diferente de \`'not_relevant'\` (ex.: \`'no_data'\`,
+  \`'insufficient_entries'\`, \`'insufficient_span'\`, \`'insufficient_pairs'\`,
+  \`'insufficient_samples'\`, \`'no_recent_data'\`, \`'not_computable'\`)
+  significam que o atleta REGISTROU algo mas ainda não há amostragem
+  suficiente para a análise específica. Nesses casos:
+  * NÃO diga genericamente "não há dados";
+  * Explique claramente o motivo e cite os números disponíveis em
+    \`dataCoverage\` (ex.: \`entries\`, \`spanDays\`, \`sampleSize\`,
+    \`eventCount\`, \`daysWithIntake\`);
+  * Exemplo correto: "Há 4 medições de composição corporal nos últimos
+    30 dias, mas o intervalo entre elas é de 9 dias, insuficiente para
+    tendência confiável (mínimo 14 dias)."
+- Sempre que existir seção \`alcohol\` disponível, use \`last7Days\` /
+  \`last30Days\` (gramas, dias com consumo, eventos) para caracterizar
+  o consumo antes de comentar HRV.
+- Se \`alcoholTrend.hrvImpact.available === true\`, cite \`r\`,
+  \`classification\` e \`sampleSize\`. Se \`false\`, informe quantos pares
+  seriam necessários (mínimo 10).
 - Nunca invente números, slopes ou tendências.
 - Campos \`null\` significam "sem registro" — não os interprete.
 
@@ -59,7 +74,8 @@ Você é um analista técnico de performance esportiva. Recebe:
 (cruzamento de dados, citando números reais do contexto)
 
 **LIMITAÇÕES DOS DADOS**
-(quando houver seções indisponíveis ou amostras pequenas)
+(quando houver seções indisponíveis ou amostras pequenas — cite motivo
+estruturado e contagens de \`dataCoverage\`)
 
 **O QUE OBSERVAR**
 (sinais a monitorar, sem prescrever treino)
@@ -89,6 +105,39 @@ serve(async (req) => {
     }
 
     const { performanceContext, messages, question, intent, sectionsUsed } = parseResult.data;
+
+    // ── Log seguro: apenas presença/ausência e contagens ───────────────
+    try {
+      const keys = ['today','last7Days','last30Days','bodyComposition','recentWorkouts','equipment','alcohol','alcoholTrend'];
+      const summary: Record<string, string> = {};
+      for (const k of keys) {
+        const v: any = (performanceContext as any)?.[k];
+        if (Array.isArray(v)) {
+          summary[k] = v.length > 0 ? `present(items=${v.length})` : 'empty';
+        } else if (v && typeof v === 'object') {
+          if (v.available === true) {
+            const extra: string[] = [];
+            if (k === 'bodyComposition' && v.trend30d) {
+              extra.push(`entries=${v.trend30d.entriesInWindow}`, `spanDays=${v.trend30d.spanDays}`);
+            }
+            if (k === 'alcohol' && v.last30Days) {
+              extra.push(`events30=${v.last30Days.eventCount}`, `days30=${v.last30Days.daysWithIntake}`);
+            }
+            if (k === 'alcoholTrend' && v.hrvImpact) {
+              extra.push(`hrvImpact=${v.hrvImpact.available ? `r=${v.hrvImpact.r},n=${v.hrvImpact.sampleSize}` : `unavailable(${v.hrvImpact.reason})`}`);
+            }
+            summary[k] = `present${extra.length ? '(' + extra.join(',') + ')' : ''}`;
+          } else {
+            summary[k] = `missing(${v.reason ?? 'unknown'})`;
+          }
+        } else {
+          summary[k] = 'missing';
+        }
+      }
+      console.log('[performance-coach] intent=', intent ?? 'general', 'sectionsUsed=', sectionsUsed ?? [], 'ctxKeys=', summary);
+    } catch (e) {
+      console.log('[performance-coach] logging error', (e as Error).message);
+    }
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {

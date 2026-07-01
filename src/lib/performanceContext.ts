@@ -25,7 +25,19 @@ export type SectionKey =
   | 'last30Days'
   | 'bodyComposition'
   | 'recentWorkouts'
-  | 'equipment';
+  | 'equipment'
+  | 'alcohol'
+  | 'alcoholTrend';
+
+export interface CoverageInfo {
+  status: 'available' | 'unavailable';
+  reason?: string;
+  entries?: number;
+  spanDays?: number;
+  sampleSize?: number;
+  eventCount?: number;
+  daysWithIntake?: number;
+}
 
 export interface SectionUnavailable {
   available: false;
@@ -129,15 +141,44 @@ export interface EquipmentItem {
   status: string;
 }
 
+export interface AlcoholSection {
+  available: true;
+  last7Days: {
+    totalGrams: number;
+    daysWithIntake: number;
+    eventCount: number;
+  };
+  last30Days: {
+    totalGrams: number;
+    daysWithIntake: number;
+    eventCount: number;
+    weeklyAvgGrams: number;
+  };
+  lastEventDate: string | null;
+}
+
+export interface AlcoholTrendSection {
+  available: true;
+  hrvImpact:
+    | { available: true; r: number; classification: string; label: string; sampleSize: number }
+    | { available: false; reason: 'insufficient_pairs' | 'no_data' };
+  weeklyPattern:
+    | { available: true; pattern: string; avgWeekly: number; trend: 'up' | 'down' | 'stable'; weeklyTotals: number[] }
+    | { available: false; reason: 'insufficient_samples' };
+}
+
 export interface PerformanceContext {
   generatedAt: string;
-  dataCoverage: Record<SectionKey, 'available' | 'unavailable'>;
+  dataCoverage: Record<SectionKey, CoverageInfo>;
   today: TodaySection | SectionUnavailable;
   last7Days: Last7DaysSection | SectionUnavailable;
   last30Days: Last30DaysSection | SectionUnavailable;
   bodyComposition: BodyCompositionSection | SectionUnavailable;
   recentWorkouts: RecentWorkoutItem[];
   equipment: EquipmentItem[];
+  alcohol: AlcoholSection | SectionUnavailable;
+  alcoholTrend: AlcoholTrendSection | SectionUnavailable;
+  /** @deprecated mantido por compatibilidade — use `alcohol` e `alcoholTrend`. */
   alcoholCorrelation: {
     available: boolean;
     r?: number;
@@ -465,6 +506,79 @@ function buildAlcoholCorrelation(
   };
 }
 
+function buildAlcohol(entries: AlcoholIntakeEntry[]): AlcoholSection | SectionUnavailable {
+  if (!entries || entries.length === 0) {
+    return { available: false, reason: 'no_data' };
+  }
+  const now = new Date();
+  const since7 = format(subDays(now, 6), 'yyyy-MM-dd');
+  const since30 = format(subDays(now, 29), 'yyyy-MM-dd');
+
+  const in7 = entries.filter(e => e.date >= since7);
+  const in30 = entries.filter(e => e.date >= since30);
+
+  const sumGrams = (arr: AlcoholIntakeEntry[]) =>
+    Math.round(arr.reduce((s, e) => s + (e.alcoholGrams ?? 0), 0) * 10) / 10;
+  const uniqueDays = (arr: AlcoholIntakeEntry[]) => new Set(arr.map(e => e.date)).size;
+
+  const total30 = sumGrams(in30);
+  const lastEventDate = [...entries]
+    .sort((a, b) => (a.date < b.date ? 1 : -1))[0]?.date ?? null;
+
+  return {
+    available: true,
+    last7Days: {
+      totalGrams: sumGrams(in7),
+      daysWithIntake: uniqueDays(in7),
+      eventCount: in7.length,
+    },
+    last30Days: {
+      totalGrams: total30,
+      daysWithIntake: uniqueDays(in30),
+      eventCount: in30.length,
+      weeklyAvgGrams: Math.round((total30 / 30) * 7 * 10) / 10,
+    },
+    lastEventDate,
+  };
+}
+
+function buildAlcoholTrend(
+  alcoholEntries: AlcoholIntakeEntry[],
+  dailyChecks: DailyCheck[]
+): AlcoholTrendSection | SectionUnavailable {
+  if (!alcoholEntries || alcoholEntries.length === 0) {
+    return { available: false, reason: 'no_data' };
+  }
+  const correlation = getAlcoholHRVCorrelation(
+    alcoholEntries,
+    dailyChecks.map(c => ({ date: c.date, hrv: c.hrv }))
+  );
+  const pattern = getWeeklyPattern(alcoholEntries);
+  const hasPattern = pattern.weeklyTotals.some(v => v > 0);
+
+  return {
+    available: true,
+    hrvImpact: correlation
+      ? {
+          available: true,
+          r: correlation.r,
+          classification: correlation.classification,
+          label: correlation.label,
+          sampleSize: correlation.sampleSize,
+        }
+      : { available: false, reason: 'insufficient_pairs' },
+    weeklyPattern: hasPattern
+      ? {
+          available: true,
+          pattern: pattern.pattern,
+          avgWeekly: pattern.avgWeekly,
+          trend: pattern.trend,
+          weeklyTotals: pattern.weeklyTotals,
+        }
+      : { available: false, reason: 'insufficient_samples' },
+  };
+}
+
 export function buildPerformanceContext(input: BuildInput): PerformanceContext {
   const today = buildToday(input.dailyChecks, input.workouts, input.alcoholEntries);
   const last7Days = buildLast7Days(input.dailyChecks, input.workouts, input.alcoholEntries);
@@ -472,44 +586,85 @@ export function buildPerformanceContext(input: BuildInput): PerformanceContext {
   const bodyComposition = buildBodyComposition(input.bodyComposition);
   const recentWorkouts = buildRecentWorkouts(input.workouts);
   const equipment = buildEquipment(input.equipment);
+  const alcohol = buildAlcohol(input.alcoholEntries);
+  const alcoholTrend = buildAlcoholTrend(input.alcoholEntries, input.dailyChecks);
   const alcoholCorrelation = buildAlcoholCorrelation(input.alcoholEntries, input.dailyChecks);
 
-  const sectionStatus = (s: { available?: boolean } | unknown): 'available' | 'unavailable' =>
-    s && typeof s === 'object' && (s as any).available === true ? 'available' : 'unavailable';
+  const isAvailable = (s: unknown): boolean =>
+    !!(s && typeof s === 'object' && (s as any).available === true);
+
+  const dataCoverage: Record<SectionKey, CoverageInfo> = {
+    today: { status: isAvailable(today) ? 'available' : 'unavailable' },
+    last7Days: { status: isAvailable(last7Days) ? 'available' : 'unavailable' },
+    last30Days: { status: isAvailable(last30Days) ? 'available' : 'unavailable' },
+    bodyComposition: isAvailable(bodyComposition)
+      ? {
+          status: 'available',
+          entries: (bodyComposition as BodyCompositionSection).trend30d.entriesInWindow,
+          spanDays: (bodyComposition as BodyCompositionSection).trend30d.spanDays,
+          reason:
+            'weight' in (bodyComposition as BodyCompositionSection).trend30d &&
+            (bodyComposition as BodyCompositionSection).trend30d.weight &&
+            (bodyComposition as any).trend30d.weight.available === false
+              ? (bodyComposition as any).trend30d.weight.reason
+              : undefined,
+        }
+      : { status: 'unavailable', reason: (bodyComposition as SectionUnavailable).reason },
+    recentWorkouts: {
+      status: recentWorkouts.length > 0 ? 'available' : 'unavailable',
+      entries: recentWorkouts.length,
+    },
+    equipment: {
+      status: equipment.length > 0 ? 'available' : 'unavailable',
+      entries: equipment.length,
+    },
+    alcohol: isAvailable(alcohol)
+      ? {
+          status: 'available',
+          eventCount: (alcohol as AlcoholSection).last30Days.eventCount,
+          daysWithIntake: (alcohol as AlcoholSection).last30Days.daysWithIntake,
+        }
+      : { status: 'unavailable', reason: (alcohol as SectionUnavailable).reason },
+    alcoholTrend: isAvailable(alcoholTrend)
+      ? {
+          status: 'available',
+          sampleSize:
+            (alcoholTrend as AlcoholTrendSection).hrvImpact.available
+              ? (alcoholTrend as any).hrvImpact.sampleSize
+              : 0,
+        }
+      : { status: 'unavailable', reason: (alcoholTrend as SectionUnavailable).reason },
+  };
 
   return {
     generatedAt: new Date().toISOString(),
-    dataCoverage: {
-      today: sectionStatus(today),
-      last7Days: sectionStatus(last7Days),
-      last30Days: sectionStatus(last30Days),
-      bodyComposition: sectionStatus(bodyComposition),
-      recentWorkouts: recentWorkouts.length > 0 ? 'available' : 'unavailable',
-      equipment: equipment.length > 0 ? 'available' : 'unavailable',
-    },
+    dataCoverage,
     today,
     last7Days,
     last30Days,
     bodyComposition,
     recentWorkouts,
     equipment,
+    alcohol,
+    alcoholTrend,
     alcoholCorrelation,
   };
 }
 
 export function getCoverageWarnings(ctx: PerformanceContext): string[] {
   const warnings: string[] = [];
-  if (ctx.dataCoverage.today === 'unavailable') {
+  if (ctx.dataCoverage.today.status === 'unavailable') {
     warnings.push('Sem check-in de hoje — métricas do dia indisponíveis.');
   }
-  if (ctx.dataCoverage.last7Days === 'unavailable') {
+  if (ctx.dataCoverage.last7Days.status === 'unavailable') {
     warnings.push('Menos de 3 dias com check-in nos últimos 7 dias.');
   }
-  if (ctx.dataCoverage.last30Days === 'unavailable') {
+  if (ctx.dataCoverage.last30Days.status === 'unavailable') {
     warnings.push('Sem dados suficientes nos últimos 30 dias para análise de tendência.');
   }
-  if (ctx.dataCoverage.bodyComposition === 'unavailable') {
+  if (ctx.dataCoverage.bodyComposition.status === 'unavailable') {
     warnings.push('Sem medições de composição corporal — análise corporal limitada.');
   }
   return warnings;
 }
+
