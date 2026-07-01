@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { StravaConnection, StravaActivity, StravaActivityDetails } from '@/types/strava';
@@ -180,13 +181,37 @@ export function useStravaConnection() {
     }
   };
 
-  const listActivities = async (): Promise<StravaActivity[]> => {
+  const handleStravaErrorToast = (code?: string, message?: string) => {
+    const label = message || 'Erro ao comunicar com o Strava.';
+    if (code === 'strava_app_inactive') {
+      toast.error('App Strava inativo', {
+        description: 'O app OAuth está desativado no painel de desenvolvedor do Strava. Reative em strava.com/settings/api.',
+        duration: 8000,
+      });
+    } else if (code === 'insufficient_scope' || code === 'strava_unauthorized' || code === 'strava_refresh_failed') {
+      toast.error('Reconecte o Strava', { description: label, duration: 7000 });
+    } else if (code === 'strava_rate_limited') {
+      toast.error('Limite do Strava atingido', { description: label });
+    } else if (code === 'strava_not_connected') {
+      toast.error('Strava não conectado', { description: label });
+    } else {
+      toast.error('Falha ao consultar o Strava', { description: label });
+    }
+  };
+
+  const listActivities = async (opts?: { afterDays?: number }): Promise<StravaActivity[]> => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return [];
 
+      const qs = new URLSearchParams({ action: 'list' });
+      if (opts?.afterDays && opts.afterDays > 0) {
+        const afterSec = Math.floor((Date.now() - opts.afterDays * 86400 * 1000) / 1000);
+        qs.set('after', String(afterSec));
+      }
+
       const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/strava-import?action=list`,
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/strava-import?${qs.toString()}`,
         {
           headers: {
             'Content-Type': 'application/json',
@@ -195,14 +220,18 @@ export function useStravaConnection() {
         }
       );
 
+      const result = await response.json().catch(() => ({}));
+
       if (!response.ok) {
-        throw new Error('Failed to list activities');
+        console.error('Strava list error:', result);
+        handleStravaErrorToast(result?.error, result?.message);
+        return [];
       }
 
-      const result = await response.json();
       return result.activities || [];
     } catch (err) {
       console.error('Error listing Strava activities:', err);
+      toast.error('Falha de rede ao consultar o Strava');
       return [];
     }
   };
@@ -222,11 +251,14 @@ export function useStravaConnection() {
         }
       );
 
+      const result = await response.json().catch(() => ({}));
+
       if (!response.ok) {
-        throw new Error('Failed to get activity details');
+        console.error('Strava details error:', result);
+        handleStravaErrorToast(result?.error, result?.message);
+        return null;
       }
 
-      const result = await response.json();
       return result.activity || null;
     } catch (err) {
       console.error('Error getting activity details:', err);
