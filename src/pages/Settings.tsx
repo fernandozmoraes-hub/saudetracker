@@ -6,8 +6,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useUserSettings } from '@/hooks/useUserSettings';
 import { useStravaConnection } from '@/hooks/useStravaConnection';
+import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
-import { Heart, Save, Info, Loader2, Activity, Dumbbell, Zap, Link2, Unlink, CheckCircle2, Footprints, ChevronRight, Scale, Wine, UserCheck } from 'lucide-react';
+import { Heart, Save, Info, Loader2, Activity, Dumbbell, Zap, Link2, Unlink, CheckCircle2, Footprints, ChevronRight, Scale, Wine, UserCheck, LogOut } from 'lucide-react';
 import { DEFAULT_LTHR, DEFAULT_ZONE_THRESHOLDS, getHrZones, ZONE_WEIGHTS } from '@/lib/calculations';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Link } from 'react-router-dom';
@@ -22,6 +23,13 @@ export default function Settings() {
   const { settings, isLoading, updateSettings } = useUserSettings();
   const { connection, isLoading: isLoadingStrava, isConnecting, isConnected, connect, disconnect, handleCallback, handleOAuthCallback } = useStravaConnection();
   const { invites, acceptInvite, rejectInvite } = usePendingInvites();
+  const { signOut, user } = useAuth();
+  const [isSigningOut, setIsSigningOut] = useState(false);
+
+  const handleSignOut = async () => {
+    setIsSigningOut(true);
+    await signOut();
+  };
 
   const handleAcceptInvite = async (id: string) => {
     const err = await acceptInvite(id);
@@ -584,6 +592,26 @@ export default function Settings() {
         <p className="text-3xl font-display font-bold text-primary">
           {settings.lthr} <span className="text-lg font-normal text-muted-foreground">bpm</span>
         </p>
+      </div>
+
+      {/* Account */}
+      <div className="gradient-card rounded-xl p-5 border border-border/50 space-y-3 animate-slide-up">
+        {user?.email && (
+          <p className="text-sm text-muted-foreground truncate">Logado como {user.email}</p>
+        )}
+        <Button
+          variant="outline"
+          className="w-full text-destructive hover:text-destructive"
+          onClick={handleSignOut}
+          disabled={isSigningOut}
+        >
+          {isSigningOut ? (
+            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+          ) : (
+            <LogOut className="w-4 h-4 mr-2" />
+          )}
+          Sair
+        </Button>
       </div>
     </PageContainer>
   );
