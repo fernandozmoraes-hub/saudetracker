@@ -1,95 +1,138 @@
+import { cn } from '@/lib/utils';
+import { AlertTriangle, CheckCircle2, TrendingDown } from 'lucide-react';
 import { ComplianceStats } from '@/hooks/useCoachCompliance';
-import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { AlertTriangle, CheckCircle, XCircle, Clock } from 'lucide-react';
 
 interface ComplianceBadgeProps {
-  stats?: ComplianceStats;
-  variant: 'compact' | 'full';
+  stats: ComplianceStats;
+  /** 'compact' para cards do dashboard, 'full' para o perfil do atleta */
+  variant?: 'compact' | 'full';
 }
 
-function getColor(rate: number) {
-  if (rate >= 80) return 'text-green-600';
-  if (rate >= 50) return 'text-yellow-600';
-  return 'text-red-600';
+function getRateColor(rate: number | null) {
+  if (rate === null) return 'text-muted-foreground';
+  if (rate >= 80) return 'text-green-500';
+  if (rate >= 50) return 'text-yellow-500';
+  return 'text-red-500';
 }
 
-function getBgColor(rate: number) {
-  if (rate >= 80) return 'bg-green-100 text-green-800';
-  if (rate >= 50) return 'bg-yellow-100 text-yellow-800';
-  return 'bg-red-100 text-red-800';
+function getRateBg(rate: number | null) {
+  if (rate === null) return 'bg-muted/50';
+  if (rate >= 80) return 'bg-green-500/10 border-green-500/30';
+  if (rate >= 50) return 'bg-yellow-500/10 border-yellow-500/30';
+  return 'bg-red-500/10 border-red-500/30';
 }
 
-function getProgressColor(rate: number) {
-  if (rate >= 80) return '[&>div]:bg-green-500';
-  if (rate >= 50) return '[&>div]:bg-yellow-500';
-  return '[&>div]:bg-red-500';
+function getRateBarColor(rate: number | null) {
+  if (rate === null) return 'bg-muted';
+  if (rate >= 80) return 'bg-green-500';
+  if (rate >= 50) return 'bg-yellow-500';
+  return 'bg-red-500';
 }
 
-export function ComplianceBadge({ stats, variant }: ComplianceBadgeProps) {
-  if (!stats || stats.total === 0) {
-    if (variant === 'compact') return null;
-    return (
-      <Card>
-        <CardContent className="py-6 text-center">
-          <p className="text-sm text-muted-foreground">Sem dados de adesão ainda.</p>
-        </CardContent>
-      </Card>
-    );
-  }
+/** Badge compacto para card do dashboard */
+function CompactBadge({ stats }: { stats: ComplianceStats }) {
+  const { total, completed, rate, consecutiveMissed } = stats;
+  const isIgnoring = consecutiveMissed >= 3;
 
-  if (variant === 'compact') {
-    return (
-      <div className="flex items-center gap-1.5">
-        <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${getBgColor(stats.rate)}`}>
-          {stats.completed}/{stats.total} este mês
-        </span>
-        {stats.consecutiveMissed >= 3 && (
-          <AlertTriangle className="w-4 h-4 text-orange-500" />
+  if (total === 0) return null;
+
+  return (
+    <div className="flex items-center gap-1.5">
+      {isIgnoring && (
+        <AlertTriangle className="w-3.5 h-3.5 text-orange-500 shrink-0" />
+      )}
+      <span
+        className={cn(
+          'text-xs font-medium px-2 py-0.5 rounded-full border',
+          getRateBg(rate),
+          getRateColor(rate),
         )}
-      </div>
+      >
+        {completed}/{total} este mês
+      </span>
+    </div>
+  );
+}
+
+/** Card completo para o perfil do atleta */
+function FullCard({ stats }: { stats: ComplianceStats }) {
+  const { total, completed, skipped, missed, rate, consecutiveMissed } = stats;
+  const isIgnoring = consecutiveMissed >= 3;
+
+  if (total === 0) {
+    return (
+      <p className="text-sm text-muted-foreground">
+        Nenhum treino prescrito nos últimos 30 dias.
+      </p>
     );
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base">Adesão ao Plano (30 dias)</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="flex items-center gap-3">
-          <span className={`text-3xl font-bold ${getColor(stats.rate)}`}>{stats.rate}%</span>
-          <Progress value={stats.rate} className={`flex-1 h-3 ${getProgressColor(stats.rate)}`} />
+    <div className="space-y-4">
+      {/* Alerta de ignorando o plano */}
+      {isIgnoring && (
+        <div className="flex items-start gap-2 p-3 rounded-lg bg-orange-500/10 border border-orange-500/30">
+          <AlertTriangle className="w-4 h-4 text-orange-500 mt-0.5 shrink-0" />
+          <p className="text-sm text-orange-400">
+            Atleta ignorou os últimos <strong>{consecutiveMissed}</strong> treinos seguidos.
+          </p>
         </div>
+      )}
 
-        <div className="grid grid-cols-3 gap-3 text-center">
-          <div className="p-2 bg-muted/50 rounded-lg">
-            <CheckCircle className="w-4 h-4 text-green-600 mx-auto mb-1" />
-            <p className="text-lg font-semibold text-foreground">{stats.completed}</p>
-            <p className="text-xs text-muted-foreground">Concluídos</p>
-          </div>
-          <div className="p-2 bg-muted/50 rounded-lg">
-            <XCircle className="w-4 h-4 text-red-600 mx-auto mb-1" />
-            <p className="text-lg font-semibold text-foreground">{stats.skipped}</p>
-            <p className="text-xs text-muted-foreground">Pulados</p>
-          </div>
-          <div className="p-2 bg-muted/50 rounded-lg">
-            <Clock className="w-4 h-4 text-orange-500 mx-auto mb-1" />
-            <p className="text-lg font-semibold text-foreground">{stats.missed}</p>
-            <p className="text-xs text-muted-foreground">Não feitos</p>
-          </div>
+      {/* Taxa principal */}
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <p className={cn('text-3xl font-bold', getRateColor(rate))}>
+            {rate !== null ? `${rate}%` : '—'}
+          </p>
+          <p className="text-xs text-muted-foreground mt-0.5">de adesão este mês</p>
         </div>
+        <div
+          className={cn(
+            'flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-sm font-medium',
+            getRateBg(rate),
+            getRateColor(rate),
+          )}
+        >
+          {rate !== null && rate >= 80 ? (
+            <CheckCircle2 className="w-4 h-4" />
+          ) : (
+            <TrendingDown className="w-4 h-4" />
+          )}
+          {completed}/{total} treinos
+        </div>
+      </div>
 
-        {stats.consecutiveMissed >= 3 && (
-          <div className="flex items-center gap-2 p-3 bg-orange-50 border border-orange-200 rounded-lg">
-            <AlertTriangle className="w-5 h-5 text-orange-600 shrink-0" />
-            <p className="text-sm text-orange-800">
-              Atleta ignorou os últimos {stats.consecutiveMissed} treinos seguidos
-            </p>
-          </div>
-        )}
-      </CardContent>
-    </Card>
+      {/* Barra de progresso */}
+      <div className="space-y-1">
+        <div className="h-2.5 rounded-full bg-muted overflow-hidden">
+          <div
+            className={cn('h-full rounded-full transition-all', getRateBarColor(rate))}
+            style={{ width: `${rate ?? 0}%` }}
+          />
+        </div>
+      </div>
+
+      {/* Breakdown */}
+      <div className="grid grid-cols-3 gap-2 text-center">
+        <div className="p-2 rounded-lg bg-green-500/10 space-y-0.5">
+          <p className="text-base font-bold text-green-400">{completed}</p>
+          <p className="text-[11px] text-muted-foreground">Concluídos</p>
+        </div>
+        <div className="p-2 rounded-lg bg-red-500/10 space-y-0.5">
+          <p className="text-base font-bold text-red-400">{skipped}</p>
+          <p className="text-[11px] text-muted-foreground">Pulados</p>
+        </div>
+        <div className="p-2 rounded-lg bg-orange-500/10 space-y-0.5">
+          <p className="text-base font-bold text-orange-400">{missed}</p>
+          <p className="text-[11px] text-muted-foreground">Não feitos</p>
+        </div>
+      </div>
+    </div>
   );
+}
+
+export function ComplianceBadge({ stats, variant = 'compact' }: ComplianceBadgeProps) {
+  if (variant === 'full') return <FullCard stats={stats} />;
+  return <CompactBadge stats={stats} />;
 }

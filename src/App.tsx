@@ -29,7 +29,10 @@ import SelectRole from "./pages/SelectRole";
 import CoachDashboard from "./pages/CoachDashboard";
 import CoachAthleteProfile from "./pages/CoachAthleteProfile";
 import CoachAthleteCalendar from "./pages/CoachAthleteCalendar";
+import CoachAthleteTrends from "./pages/CoachAthleteTrends";
 import PrescribeWorkout from "./pages/PrescribeWorkout";
+import ChatPage from "./pages/ChatPage";
+import MessagesPage from "./pages/MessagesPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -67,7 +70,12 @@ const App = () => (
                       <Route path="/coach" element={<ProtectedRoute requiredRole="coach"><CoachDashboard /></ProtectedRoute>} />
                       <Route path="/coach/athlete/:id" element={<ProtectedRoute requiredRole="coach"><CoachAthleteProfile /></ProtectedRoute>} />
                       <Route path="/coach/athlete/:id/calendar" element={<ProtectedRoute requiredRole="coach"><CoachAthleteCalendar /></ProtectedRoute>} />
+                      <Route path="/coach/athlete/:id/trends" element={<ProtectedRoute requiredRole="coach"><CoachAthleteTrends /></ProtectedRoute>} />
+                      <Route path="/coach/athlete/:id/chat" element={<ProtectedRoute requiredRole="coach"><ChatPage /></ProtectedRoute>} />
                       <Route path="/coach/prescribe" element={<ProtectedRoute requiredRole="coach"><PrescribeWorkout /></ProtectedRoute>} />
+                      {/* Athlete messages */}
+                      <Route path="/messages" element={<ProtectedRoute><MessagesPage /></ProtectedRoute>} />
+                      <Route path="/messages/:id" element={<ProtectedRoute><ChatPage /></ProtectedRoute>} />
                       <Route path="*" element={<NotFound />} />
                     </Routes>
                     <BottomNav />

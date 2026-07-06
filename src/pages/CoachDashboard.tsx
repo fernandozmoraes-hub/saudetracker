@@ -2,28 +2,61 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { useCoachAthletes } from '@/hooks/useCoachAthletes';
+import { useCoachCompliance } from '@/hooks/useCoachCompliance';
+import { ComplianceBadge } from '@/components/coach/ComplianceBadge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Users, UserPlus, ChevronRight, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { useCoachCompliance } from '@/hooks/useCoachCompliance';
-import { ComplianceBadge } from '@/components/coach/ComplianceBadge';
 
 export default function CoachDashboard() {
-  const { activeAthletes, pendingAthletes, isLoading, updateStatus, removeAthlete } = useCoachAthletes();
-  const { complianceMap } = useCoachCompliance();
+  const { activeAthletes, pendingAthletes, isLoading, error, inviteAthlete, updateStatus, removeAthlete } = useCoachAthletes();
+  const { getAthleteCompliance, isLoading: complianceLoading } = useCoachCompliance();
   const navigate = useNavigate();
   const [inviteEmail, setInviteEmail] = useState('');
+  const [isInviting, setIsInviting] = useState(false);
 
-  if (isLoading) {
+  if (isLoading || complianceLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
       </div>
     );
   }
+
+  if (error) {
+    toast.error(error);
+  }
+
+  const handleInvite = async () => {
+    if (!inviteEmail.trim()) {
+      toast.error('Informe o email do atleta.');
+      return;
+    }
+    setIsInviting(true);
+    const err = await inviteAthlete(inviteEmail);
+    setIsInviting(false);
+    if (err) {
+      toast.error(err);
+    } else {
+      toast.success('Convite enviado! O atleta verá o convite ao entrar no app.');
+      setInviteEmail('');
+    }
+  };
+
+  const handleActivate = async (id: string) => {
+    const err = await updateStatus(id, 'active');
+    if (err) toast.error(err);
+    else toast.success('Atleta ativado!');
+  };
+
+  const handleRemove = async (id: string) => {
+    const err = await removeAthlete(id);
+    if (err) toast.error(err);
+    else toast.success('Atleta removido.');
+  };
 
   return (
     <PageContainer title="Coach Dashboard" subtitle={`${activeAthletes.length} atleta(s) ativo(s)`}>
@@ -38,20 +71,19 @@ export default function CoachDashboard() {
           </CardHeader>
           <CardContent>
             <p className="text-sm text-muted-foreground mb-4">
-              Para adicionar um atleta, solicite que ele compartilhe seu ID de usuário com você.
+              Digite o email do atleta cadastrado no app para enviar um convite.
             </p>
             <div className="flex gap-2">
               <Input
-                placeholder="ID do atleta"
+                type="email"
+                placeholder="email@atleta.com"
                 value={inviteEmail}
                 onChange={(e) => setInviteEmail(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleInvite()}
+                disabled={isInviting}
               />
-              <Button
-                onClick={() => {
-                  toast.info('Funcionalidade de convite em desenvolvimento.');
-                }}
-              >
-                Convidar
+              <Button onClick={handleInvite} disabled={isInviting}>
+                {isInviting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Convidar'}
               </Button>
             </div>
           </CardContent>
@@ -66,12 +98,19 @@ export default function CoachDashboard() {
             <CardContent className="space-y-2">
               {pendingAthletes.map((athlete) => (
                 <div key={athlete.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
-                  <span className="text-sm text-foreground">{athlete.athlete_id.slice(0, 8)}...</span>
+                  <div>
+                    <p className="text-sm font-medium text-foreground">
+                      {athlete.athlete_name ?? athlete.athlete_email ?? athlete.athlete_id.slice(0, 8) + '...'}
+                    </p>
+                    {athlete.athlete_email && athlete.athlete_name && (
+                      <p className="text-xs text-muted-foreground">{athlete.athlete_email}</p>
+                    )}
+                  </div>
                   <div className="flex gap-2">
-                    <Button size="sm" variant="outline" onClick={() => updateStatus(athlete.id, 'active')}>
+                    <Button size="sm" variant="outline" onClick={() => handleActivate(athlete.id)}>
                       Ativar
                     </Button>
-                    <Button size="sm" variant="ghost" onClick={() => removeAthlete(athlete.id)}>
+                    <Button size="sm" variant="ghost" onClick={() => handleRemove(athlete.id)}>
                       Remover
                     </Button>
                   </div>
@@ -92,28 +131,36 @@ export default function CoachDashboard() {
             <Card>
               <CardContent className="py-8 text-center">
                 <p className="text-muted-foreground">Nenhum atleta ativo ainda.</p>
-                <p className="text-sm text-muted-foreground mt-1">Convide atletas para começar a monitorar.</p>
+                <p className="text-sm text-muted-foreground mt-1">Convide atletas pelo email para começar.</p>
               </CardContent>
             </Card>
           ) : (
-            activeAthletes.map((athlete) => (
-              <Card
-                key={athlete.id}
-                className="cursor-pointer hover:border-primary/50 transition-colors"
-                onClick={() => navigate(`/coach/athlete/${athlete.athlete_id}`)}
-              >
-                <CardContent className="flex items-center justify-between p-4">
-                  <div>
-                    <p className="font-medium text-foreground">{athlete.athlete_id.slice(0, 8)}...</p>
-                    <div className="flex items-center gap-2 mt-1">
-                      <Badge variant="secondary" className="text-xs">Ativo</Badge>
-                      <ComplianceBadge variant="compact" stats={complianceMap.get(athlete.athlete_id)} />
+            activeAthletes.map((athlete) => {
+              const compliance = getAthleteCompliance(athlete.athlete_id);
+              return (
+                <Card
+                  key={athlete.id}
+                  className="cursor-pointer hover:border-primary/50 transition-colors"
+                  onClick={() => navigate(`/coach/athlete/${athlete.athlete_id}`)}
+                >
+                  <CardContent className="flex items-center justify-between p-4">
+                    <div className="space-y-1 min-w-0">
+                      <p className="font-medium text-foreground truncate">
+                        {athlete.athlete_name ?? athlete.athlete_email ?? athlete.athlete_id.slice(0, 8) + '...'}
+                      </p>
+                      {athlete.athlete_email && (
+                        <p className="text-xs text-muted-foreground truncate">{athlete.athlete_email}</p>
+                      )}
+                      <div className="flex flex-wrap items-center gap-2 pt-0.5">
+                        <Badge variant="secondary" className="text-xs">Ativo</Badge>
+                        <ComplianceBadge stats={compliance} variant="compact" />
+                      </div>
                     </div>
-                  </div>
-                  <ChevronRight className="w-5 h-5 text-muted-foreground" />
-                </CardContent>
-              </Card>
-            ))
+                    <ChevronRight className="w-5 h-5 text-muted-foreground shrink-0 ml-2" />
+                  </CardContent>
+                </Card>
+              );
+            })
           )}
         </div>
       </div>

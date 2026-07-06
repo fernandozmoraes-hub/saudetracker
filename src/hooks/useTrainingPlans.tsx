@@ -21,6 +21,7 @@ export function useTrainingPlans(athleteId?: string) {
   const { user } = useAuth();
   const [plans, setPlans] = useState<TrainingPlan[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchPlans = useCallback(async () => {
     if (!user) {
@@ -30,6 +31,7 @@ export function useTrainingPlans(athleteId?: string) {
     }
 
     try {
+      setError(null);
       let query = supabase
         .from('training_plans')
         .select('*')
@@ -39,11 +41,12 @@ export function useTrainingPlans(athleteId?: string) {
         query = query.eq('athlete_id', athleteId);
       }
 
-      const { data, error } = await query;
-      if (error) throw error;
+      const { data, error: fetchError } = await query;
+      if (fetchError) throw fetchError;
       setPlans((data as unknown as TrainingPlan[]) || []);
     } catch (err) {
       console.error('Error fetching training plans:', err);
+      setError('Não foi possível carregar os treinos planejados.');
     } finally {
       setIsLoading(false);
     }
@@ -53,59 +56,61 @@ export function useTrainingPlans(athleteId?: string) {
     fetchPlans();
   }, [fetchPlans]);
 
-  const createPlan = async (plan: Omit<TrainingPlan, 'id' | 'created_at'>): Promise<boolean> => {
-    if (!user) return false;
+  /** Retorna null em sucesso, ou mensagem de erro */
+  const createPlan = async (plan: Omit<TrainingPlan, 'id' | 'created_at'>): Promise<string | null> => {
+    if (!user) return 'Usuário não autenticado.';
 
-    const { error } = await supabase
+    const { error: insertError } = await supabase
       .from('training_plans')
       .insert(plan as any);
 
-    if (error) {
-      console.error('Error creating training plan:', error);
-      return false;
+    if (insertError) {
+      console.error('Error creating training plan:', insertError);
+      return 'Erro ao criar treino. Tente novamente.';
     }
 
     await fetchPlans();
-    return true;
+    return null;
   };
 
-  const updatePlan = async (id: string, updates: Partial<TrainingPlan>): Promise<boolean> => {
-    if (!user) return false;
+  const updatePlan = async (id: string, updates: Partial<TrainingPlan>): Promise<string | null> => {
+    if (!user) return 'Usuário não autenticado.';
 
-    const { error } = await supabase
+    const { error: updateError } = await supabase
       .from('training_plans')
       .update(updates as any)
       .eq('id', id);
 
-    if (error) {
-      console.error('Error updating training plan:', error);
-      return false;
+    if (updateError) {
+      console.error('Error updating training plan:', updateError);
+      return 'Erro ao atualizar treino.';
     }
 
     await fetchPlans();
-    return true;
+    return null;
   };
 
-  const deletePlan = async (id: string): Promise<boolean> => {
-    if (!user) return false;
+  const deletePlan = async (id: string): Promise<string | null> => {
+    if (!user) return 'Usuário não autenticado.';
 
-    const { error } = await supabase
+    const { error: deleteError } = await supabase
       .from('training_plans')
       .delete()
       .eq('id', id);
 
-    if (error) {
-      console.error('Error deleting training plan:', error);
-      return false;
+    if (deleteError) {
+      console.error('Error deleting training plan:', deleteError);
+      return 'Erro ao remover treino.';
     }
 
     await fetchPlans();
-    return true;
+    return null;
   };
 
   return {
     plans,
     isLoading,
+    error,
     createPlan,
     updatePlan,
     deletePlan,

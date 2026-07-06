@@ -3,13 +3,15 @@ import { PageContainer } from '@/components/layout/PageContainer';
 import { MetricCard } from '@/components/ui/MetricCard';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { LoadStatusCard } from '@/components/ui/LoadStatusCard';
-
+import { AICoach } from '@/components/AICoach';
 import { TrendCharts, TrendPeriod } from '@/components/TrendCharts';
 import { Button } from '@/components/ui/button';
 import { getTodayMetrics } from '@/lib/calculations';
 import { formatMetric } from '@/lib/formatMetric';
 import { useData } from '@/hooks/useData';
 import { useAlcoholIntake } from '@/hooks/useAlcoholIntake';
+import { useTrainingPlans } from '@/hooks/useTrainingPlans';
+import { PlannedWorkoutCard } from '@/components/calendar/PlannedWorkoutCard';
 import { getAlcoholHRVCorrelation, getCorrelationColor, getCorrelationBgColor, getWeeklyPattern, getWeeklyPatternColor, getTrendArrow } from '@/lib/alcoholCalcs';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -55,6 +57,9 @@ const recommendationConfig = {
 export default function Today() {
   const { dailyChecks, workouts, isLoading } = useData();
   const { entries: alcoholEntries } = useAlcoholIntake();
+  const { plans } = useTrainingPlans();
+  const todayStr = format(new Date(), 'yyyy-MM-dd');
+  const todayPlans = plans.filter(p => p.date === todayStr);
 
   const correlation = useMemo(
     () => getAlcoholHRVCorrelation(alcoholEntries, dailyChecks.map(c => ({ date: c.date, hrv: c.hrv }))),
@@ -155,6 +160,21 @@ export default function Today() {
         <p className="text-sm text-muted-foreground">{recommendation.description}</p>
       </div>
       
+      {/* Prescribed workout for today */}
+      {todayPlans.length > 0 && (
+        <div className="space-y-2 animate-slide-up">
+          <div className="flex items-center gap-2">
+            <Dumbbell className="w-5 h-5 text-primary" />
+            <h3 className="font-display font-semibold">Treino prescrito para hoje</h3>
+          </div>
+          {todayPlans.map((plan) => (
+            <PlannedWorkoutCard key={plan.id} plan={plan} date={new Date()} />
+          ))}
+        </div>
+      )}
+
+      {/* AI Coach Analysis */}
+      <AICoach />
 
       {/* Performance Coach access */}
       <Link

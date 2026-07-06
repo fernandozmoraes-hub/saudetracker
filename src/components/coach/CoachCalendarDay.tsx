@@ -1,121 +1,179 @@
-import { format, isToday } from 'date-fns';
+import { format, isToday, isPast, isFuture } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Badge } from '@/components/ui/badge';
-import { Card } from '@/components/ui/card';
-import { TrainingPlan } from '@/hooks/useTrainingPlans';
 import { cn } from '@/lib/utils';
-
-interface Workout {
-  id: string;
-  date: string;
-  type: string;
-  duration_min: number;
-  rpe: number;
-  tss_final: number | null;
-  tss_subjective: number;
-}
+import { TrainingPlan } from '@/hooks/useTrainingPlans';
+import { CheckCircle2, XCircle, Clock, Dumbbell, AlertCircle } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 
 interface CoachCalendarDayProps {
   date: Date;
   plans: TrainingPlan[];
-  workouts: Workout[];
+  workouts: any[];
 }
 
-const statusConfig: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline'; className?: string }> = {
-  completed: { label: 'Concluído', variant: 'default', className: 'bg-emerald-600 hover:bg-emerald-600' },
-  planned: { label: 'Planejado', variant: 'secondary', className: 'bg-blue-500 hover:bg-blue-500 text-white' },
-  skipped: { label: 'Pulado', variant: 'destructive' },
+const typeLabels: Record<string, string> = {
+  endurance: 'Endurance',
+  strength: 'Força',
+  hiit: 'HIIT',
+  recovery: 'Recuperação',
+  Run: 'Corrida',
+  Bike: 'Bike',
+  Strength: 'Força',
+  Rest: 'Descanso',
+};
+
+const typeColors: Record<string, string> = {
+  endurance: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
+  strength: 'bg-orange-500/10 text-orange-400 border-orange-500/20',
+  hiit: 'bg-red-500/10 text-red-400 border-red-500/20',
+  recovery: 'bg-green-500/10 text-green-400 border-green-500/20',
+  Run: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
+  Bike: 'bg-green-500/10 text-green-400 border-green-500/20',
+  Strength: 'bg-orange-500/10 text-orange-400 border-orange-500/20',
+  Rest: 'bg-muted text-muted-foreground border-border',
+};
+
+function getPlanStatus(plan: TrainingPlan, date: Date): 'completed' | 'skipped' | 'upcoming' | 'missed' {
+  if (plan.status === 'completed') return 'completed';
+  if (plan.status === 'skipped') return 'skipped';
+  if (isFuture(date) || isToday(date)) return 'upcoming';
+  return 'missed';
+}
+
+const statusConfig = {
+  completed: { icon: CheckCircle2, color: 'text-green-500', label: 'Concluído', bg: 'bg-green-500/10 border-green-500/30' },
+  skipped:   { icon: XCircle,      color: 'text-red-500',   label: 'Pulado',    bg: 'bg-red-500/10 border-red-500/30' },
+  upcoming:  { icon: Clock,        color: 'text-blue-400',  label: 'Planejado', bg: 'bg-blue-500/10 border-blue-500/30' },
+  missed:    { icon: AlertCircle,  color: 'text-orange-500',label: 'Não feito', bg: 'bg-orange-500/10 border-orange-500/30' },
 };
 
 export function CoachCalendarDay({ date, plans, workouts }: CoachCalendarDayProps) {
-  const dateStr = format(date, 'yyyy-MM-dd');
-  const dayPlans = plans.filter(p => p.date === dateStr);
-  const dayWorkouts = workouts.filter(w => w.date === dateStr);
+  const isCurrentDay = isToday(date);
+  const dayName = format(date, 'EEE', { locale: ptBR });
+  const dayNumber = format(date, 'd');
+  const monthName = format(date, 'MMM', { locale: ptBR });
 
-  // Find "extra" workouts (no matching plan)
-  const plannedWorkoutIds = new Set(dayPlans.map(p => p.workout_id).filter(Boolean));
-  const extraWorkouts = dayWorkouts.filter(w => !plannedWorkoutIds.has(w.id));
-
-  // Check unfinished plans
-  const unfinishedPlans = dayPlans.filter(p => p.status === 'planned' && new Date(dateStr) < new Date(format(new Date(), 'yyyy-MM-dd')));
-
-  const today = isToday(date);
+  const plannedTSS = plans.reduce((s, p) => s + (Number(p.planned_tss) || 0), 0);
+  const actualTSS = workouts.reduce((s, w) => s + (Number(w.tss_final) || Number(w.tss_subjective) || 0), 0);
 
   return (
-    <Card className={cn(
-      'p-3 space-y-2 min-h-[120px]',
-      today && 'ring-2 ring-primary'
-    )}>
+    <div
+      className={cn(
+        'rounded-xl border border-border bg-card p-4 space-y-3 transition-all',
+        isCurrentDay && 'ring-2 ring-primary border-primary bg-primary/5',
+      )}
+    >
+      {/* Day Header */}
       <div className="flex items-center justify-between">
-        <span className={cn(
-          'text-xs font-semibold uppercase',
-          today ? 'text-primary' : 'text-muted-foreground'
-        )}>
-          {format(date, 'EEE', { locale: ptBR })}
-        </span>
-        <span className={cn(
-          'text-sm font-bold',
-          today ? 'text-primary' : 'text-foreground'
-        )}>
-          {format(date, 'dd')}
-        </span>
+        <div className="flex items-center gap-3">
+          <div
+            className={cn(
+              'w-12 h-12 rounded-lg flex flex-col items-center justify-center text-center',
+              isCurrentDay ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground',
+            )}
+          >
+            <span className="text-lg font-bold leading-none">{dayNumber}</span>
+            <span className="text-[10px] uppercase">{monthName}</span>
+          </div>
+          <div>
+            <p className={cn('font-medium capitalize', isCurrentDay ? 'text-primary' : 'text-foreground')}>
+              {dayName}
+            </p>
+            {isCurrentDay && <span className="text-xs text-primary font-medium">Hoje</span>}
+          </div>
+        </div>
+
+        {/* TSS comparison */}
+        {(plannedTSS > 0 || actualTSS > 0) && (
+          <div className="text-right text-xs space-y-0.5">
+            {plannedTSS > 0 && (
+              <p className="text-muted-foreground">
+                Plan: <span className="font-semibold text-foreground">{Math.round(plannedTSS)}</span>
+              </p>
+            )}
+            {actualTSS > 0 && (
+              <p className="text-muted-foreground">
+                Real: <span className="font-semibold text-green-400">{Math.round(actualTSS)}</span>
+              </p>
+            )}
+          </div>
+        )}
       </div>
 
-      {/* Planned workouts */}
-      {dayPlans.map(plan => {
-        const config = statusConfig[plan.status] || statusConfig.planned;
-        const isUnfinished = plan.status === 'planned' && new Date(dateStr) < new Date(format(new Date(), 'yyyy-MM-dd'));
+      {/* Plans */}
+      {plans.map((plan) => {
+        const status = getPlanStatus(plan, date);
+        const cfg = statusConfig[status];
+        const Icon = cfg.icon;
+        const colorClass = typeColors[plan.type] ?? typeColors.endurance;
 
         return (
-          <div key={plan.id} className="rounded-md bg-muted/50 p-2 space-y-1">
-            <div className="flex items-center justify-between gap-1">
-              <span className="text-xs font-medium text-foreground truncate">{plan.type}</span>
-              <Badge
-                variant={isUnfinished ? 'destructive' : config.variant}
-                className={cn('text-[10px] px-1.5 py-0', !isUnfinished && config.className)}
-              >
-                {isUnfinished ? 'Não feito' : config.label}
-              </Badge>
+          <div
+            key={plan.id}
+            className={cn('rounded-lg border p-3 space-y-1.5', cfg.bg)}
+          >
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <Dumbbell className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                <span className={cn('text-xs px-2 py-0.5 rounded-full border font-medium', colorClass)}>
+                  {typeLabels[plan.type] ?? plan.type}
+                </span>
+              </div>
+              <div className={cn('flex items-center gap-1 text-xs font-medium shrink-0', cfg.color)}>
+                <Icon className="w-3.5 h-3.5" />
+                {cfg.label}
+              </div>
             </div>
-            <p className="text-[10px] text-muted-foreground">
-              {plan.planned_duration_min}min
-              {plan.planned_zone ? ` • Z${plan.planned_zone}` : ''}
-              {plan.planned_tss ? ` • TSS ${plan.planned_tss}` : ''}
-            </p>
-            {plan.notes && (
-              <p className="text-[10px] text-muted-foreground italic truncate">{plan.notes}</p>
-            )}
+            <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground pl-5">
+              {plan.planned_duration_min && <span>{plan.planned_duration_min}min</span>}
+              {plan.planned_zone && <span>Z{plan.planned_zone}</span>}
+              {plan.planned_tss && <span>TSS {plan.planned_tss}</span>}
+              {plan.notes && <span className="italic truncate max-w-[180px]">"{plan.notes}"</span>}
+            </div>
           </div>
         );
       })}
 
-      {/* Realized workouts linked to plans */}
-      {dayWorkouts.filter(w => plannedWorkoutIds.has(w.id)).map(w => (
-        <div key={`real-${w.id}`} className="rounded-md bg-emerald-500/10 p-2">
-          <p className="text-[10px] font-medium text-emerald-700 dark:text-emerald-400">
-            Realizado: {w.duration_min}min • RPE {w.rpe} • TSS {Number(w.tss_final || w.tss_subjective)}
-          </p>
-        </div>
-      ))}
+      {/* Actual workouts */}
+      {workouts.map((w: any) => {
+        const isPlanned = plans.some((p) => p.status === 'completed' && p.workout_id === w.id);
+        const colorClass = typeColors[w.type] ?? typeColors.Run;
 
-      {/* Extra workouts */}
-      {extraWorkouts.map(w => (
-        <div key={`extra-${w.id}`} className="rounded-md bg-amber-500/10 p-2 space-y-1">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-foreground">{w.type}</span>
-            <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-amber-500 text-amber-600">
-              Extra
-            </Badge>
+        return (
+          <div
+            key={w.id}
+            className={cn(
+              'rounded-lg border p-3 space-y-1.5',
+              isPlanned ? 'opacity-60' : 'bg-green-500/5 border-green-500/20',
+            )}
+          >
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <CheckCircle2 className="w-3.5 h-3.5 text-green-500 shrink-0" />
+                <span className={cn('text-xs px-2 py-0.5 rounded-full border font-medium', colorClass)}>
+                  {typeLabels[w.type] ?? w.type}
+                </span>
+                {!isPlanned && (
+                  <Badge variant="outline" className="text-[10px] py-0 h-4">Extra</Badge>
+                )}
+              </div>
+              <span className="text-xs font-semibold text-green-400 shrink-0">
+                TSS {Math.round(Number(w.tss_final) || Number(w.tss_subjective) || 0)}
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground pl-5">
+              {w.duration_min && <span>{w.duration_min}min</span>}
+              {w.rpe && <span>RPE {w.rpe}</span>}
+              {w.distance_km && <span>{Number(w.distance_km).toFixed(1)} km</span>}
+            </div>
           </div>
-          <p className="text-[10px] text-muted-foreground">
-            {w.duration_min}min • RPE {w.rpe} • TSS {Number(w.tss_final || w.tss_subjective)}
-          </p>
-        </div>
-      ))}
+        );
+      })}
 
-      {dayPlans.length === 0 && dayWorkouts.length === 0 && (
-        <p className="text-[10px] text-muted-foreground text-center pt-4">Descanso</p>
+      {/* Empty day */}
+      {plans.length === 0 && workouts.length === 0 && (
+        <p className="text-center text-xs text-muted-foreground py-2">Descanso</p>
       )}
-    </Card>
+    </div>
   );
 }

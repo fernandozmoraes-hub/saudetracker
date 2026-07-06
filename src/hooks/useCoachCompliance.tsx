@@ -1,31 +1,38 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
-import { TrainingPlan } from './useTrainingPlans';
 import { format, subDays } from 'date-fns';
+import { TrainingPlan } from './useTrainingPlans';
 
 export interface ComplianceStats {
-  total: number;
-  completed: number;
-  skipped: number;
-  missed: number;
-  rate: number;
-  consecutiveMissed: number;
+  total: number;        // planos no passado (últimos 30 dias)
+  completed: number;    // status = 'completed'
+  skipped: number;      // status = 'skipped'
+  missed: number;       // status = 'planned' + data no passado
+  rate: number | null;  // % de adesão (completed / total * 100)
+  consecutiveMissed: number; // quantos planos seguidos foram ignorados/pulados
 }
 
 export function computeCompliance(plans: TrainingPlan[]): ComplianceStats {
   const today = format(new Date(), 'yyyy-MM-dd');
-  const completed = plans.filter(p => p.status === 'completed').length;
-  const skipped = plans.filter(p => p.status === 'skipped').length;
-  const missed = plans.filter(p => p.status === 'planned' && p.date < today).length;
-  const total = completed + skipped + missed;
-  const rate = total > 0 ? Math.round((completed / total) * 100) : 0;
+  const last30 = format(subDays(new Date(), 30), 'yyyy-MM-dd');
 
-  // Count consecutive missed/skipped from most recent
-  const sorted = [...plans].sort((a, b) => b.date.localeCompare(a.date));
+  const pastPlans = plans.filter((p) => p.date <= today && p.date >= last30);
+  const completed = pastPlans.filter((p) => p.status === 'completed').length;
+  const skipped = pastPlans.filter((p) => p.status === 'skipped').length;
+  const missed = pastPlans.filter((p) => p.status === 'planned' && p.date < today).length;
+  const total = completed + skipped + missed;
+  const rate = total > 0 ? Math.round((completed / total) * 100) : null;
+
+  // Conta quantos planos consecutivos (do mais recente para o mais antigo) foram
+  // ignorados ou pulados — indica que o atleta parou de seguir o plano
+  const sortedDesc = [...pastPlans]
+    .filter((p) => p.date < today)
+    .sort((a, b) => b.date.localeCompare(a.date));
+
   let consecutiveMissed = 0;
-  for (const p of sorted) {
-    if (p.status === 'skipped' || (p.status === 'planned' && p.date < today)) {
+  for (const plan of sortedDesc) {
+    if (plan.status === 'skipped' || (plan.status === 'planned' && plan.date < today)) {
       consecutiveMissed++;
     } else {
       break;
@@ -37,44 +44,43 @@ export function computeCompliance(plans: TrainingPlan[]): ComplianceStats {
 
 export function useCoachCompliance() {
   const { user } = useAuth();
-  const [complianceMap, setComplianceMap] = useState<Map<string, ComplianceStats>>(new Map());
+  const [plansByAthlete, setPlansByAthlete] = useState<Map<string, TrainingPlan[]>>(new Map());
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    if (!user) return;
+  const fetch = useCallback(async () => {
+    if (!user) { setIsLoading(false); return; }
 
-    const fetch = async () => {
-      const since = format(subDays(new Date(), 30), 'yyyy-MM-dd');
-      const { data, error } = await supabase
-        .from('training_plans')
-        .select('*')
-        .eq('coach_id', user.id)
-        .gte('date', since);
+    const last30 = format(subDays(new Date(), 30), 'yyyy-MM-dd');
+    const today = format(new Date(), 'yyyy-MM-dd');
 
-      if (error) {
-        console.error('Error fetching compliance data:', error);
-        setIsLoading(false);
-        return;
-      }
+    const { data, error } = await supabase
+      .from('training_plans')
+      .select('*')
+      .eq('coach_id', user.id)
+      .gte('date', last30)
+      .lte('date', today)
+      .order('date', { ascending: false });
 
-      const grouped = new Map<string, TrainingPlan[]>();
-      for (const plan of (data as unknown as TrainingPlan[]) || []) {
-        const list = grouped.get(plan.athlete_id) || [];
-        list.push(plan);
-        grouped.set(plan.athlete_id, list);
-      }
-
-      const result = new Map<string, ComplianceStats>();
-      grouped.forEach((plans, athleteId) => {
-        result.set(athleteId, computeCompliance(plans));
-      });
-
-      setComplianceMap(result);
+    if (error) {
+      console.error('Error fetching compliance data:', error);
       setIsLoading(false);
-    };
+      return;
+    }
 
-    fetch();
+    const map = new Map<string, TrainingPlan[]>();
+    for (const plan of (data as unknown as TrainingPlan[]) || []) {
+      const existing = map.get(plan.athlete_id) ?? [];
+      map.set(plan.athlete_id, [...existing, plan]);
+    }
+    setPlansByAthlete(map);
+    setIsLoading(false);
   }, [user]);
 
-  return { complianceMap, isLoading };
+  useEffect(() => { fetch(); }, [fetch]);
+
+  const getAthleteCompliance = (athleteId: string): ComplianceStats => {
+    return computeCompliance(plansByAthlete.get(athleteId) ?? []);
+  };
+
+  return { getAthleteCompliance, isLoading };
 }
