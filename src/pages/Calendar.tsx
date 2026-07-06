@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useData } from '@/hooks/useData';
+import { useTrainingPlans } from '@/hooks/useTrainingPlans';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { CalendarHeader } from '@/components/calendar/CalendarHeader';
 import { CalendarDay } from '@/components/calendar/CalendarDay';
@@ -10,6 +11,7 @@ import { ptBR } from 'date-fns/locale';
 
 export default function Calendar() {
   const { dailyChecks, workouts, isLoading } = useData();
+  const { plans } = useTrainingPlans();
   const [currentDate, setCurrentDate] = useState(new Date());
   
   if (isLoading) {
@@ -53,6 +55,7 @@ export default function Calendar() {
             const dateStr = format(day, 'yyyy-MM-dd');
             const dayCheck = dailyChecks.find(c => c.date === dateStr);
             const dayWorkouts = workouts.filter(w => w.date === dateStr);
+            const dayPlans = plans.filter(p => p.date === dateStr);
 
             return (
               <CalendarDay
@@ -60,6 +63,7 @@ export default function Calendar() {
                 date={day}
                 dailyCheck={dayCheck}
                 workouts={dayWorkouts}
+                plans={dayPlans}
               />
             );
           })}

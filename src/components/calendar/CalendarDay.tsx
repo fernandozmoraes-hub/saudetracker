@@ -3,17 +3,20 @@ import { format, isToday } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { DailyCheck, Workout } from '@/types/health';
+import { TrainingPlan } from '@/hooks/useTrainingPlans';
 import { DayMetricsCard } from './DayMetricsCard';
 import { DayWorkoutCard } from './DayWorkoutCard';
+import { PlannedWorkoutCard } from './PlannedWorkoutCard';
 import { WorkoutDetailSheet } from './WorkoutDetailSheet';
 
 interface CalendarDayProps {
   date: Date;
   dailyCheck?: DailyCheck;
   workouts: Workout[];
+  plans?: TrainingPlan[];
 }
 
-export function CalendarDay({ date, dailyCheck, workouts }: CalendarDayProps) {
+export function CalendarDay({ date, dailyCheck, workouts, plans = [] }: CalendarDayProps) {
   const [selectedWorkout, setSelectedWorkout] = useState<Workout | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
 
@@ -74,6 +77,15 @@ export function CalendarDay({ date, dailyCheck, workouts }: CalendarDayProps) {
       {/* Daily Check Metrics */}
       {dailyCheck && <DayMetricsCard dailyCheck={dailyCheck} />}
 
+      {/* Planned workouts (prescribed by coach) */}
+      {plans.length > 0 && (
+        <div className="space-y-2">
+          {plans.map((plan) => (
+            <PlannedWorkoutCard key={plan.id} plan={plan} date={date} />
+          ))}
+        </div>
+      )}
+
       {/* Workouts */}
       {workouts.length > 0 && (
         <div className="space-y-2">
@@ -88,7 +100,7 @@ export function CalendarDay({ date, dailyCheck, workouts }: CalendarDayProps) {
       )}
 
       {/* Empty State */}
-      {!dailyCheck && workouts.length === 0 && (
+      {!dailyCheck && workouts.length === 0 && plans.length === 0 && (
         <div className="text-center py-4 text-muted-foreground text-sm">
           Sem registros
         </div>
