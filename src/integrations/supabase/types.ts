@@ -212,6 +212,105 @@ export type Database = {
         }
         Relationships: []
       }
+      messages: {
+        Row: {
+          athlete_id: string
+          coach_id: string
+          content: string
+          created_at: string
+          id: string
+          read_at: string | null
+          sender_id: string
+        }
+        Insert: {
+          athlete_id: string
+          coach_id: string
+          content: string
+          created_at?: string
+          id?: string
+          read_at?: string | null
+          sender_id: string
+        }
+        Update: {
+          athlete_id?: string
+          coach_id?: string
+          content?: string
+          created_at?: string
+          id?: string
+          read_at?: string | null
+          sender_id?: string
+        }
+        Relationships: []
+      }
+      performance_coach_history: {
+        Row: {
+          answer: string
+          created_at: string
+          data_sections_used: string[]
+          entry_type: string
+          favorite: boolean
+          id: string
+          intent_detected: string
+          question: string
+          report_period_end: string | null
+          report_period_start: string | null
+          tags: string[]
+          user_id: string
+        }
+        Insert: {
+          answer: string
+          created_at?: string
+          data_sections_used?: string[]
+          entry_type?: string
+          favorite?: boolean
+          id?: string
+          intent_detected: string
+          question: string
+          report_period_end?: string | null
+          report_period_start?: string | null
+          tags?: string[]
+          user_id: string
+        }
+        Update: {
+          answer?: string
+          created_at?: string
+          data_sections_used?: string[]
+          entry_type?: string
+          favorite?: boolean
+          id?: string
+          intent_detected?: string
+          question?: string
+          report_period_end?: string | null
+          report_period_start?: string | null
+          tags?: string[]
+          user_id?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          display_name: string | null
+          email: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          display_name?: string | null
+          email?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          display_name?: string | null
+          email?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       strava_connections: {
         Row: {
           access_token: string
@@ -422,6 +521,77 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      workout_feedback: {
+        Row: {
+          athlete_id: string
+          coach_id: string
+          created_at: string
+          id: string
+          text: string
+          workout_id: string
+        }
+        Insert: {
+          athlete_id: string
+          coach_id: string
+          created_at?: string
+          id?: string
+          text: string
+          workout_id: string
+        }
+        Update: {
+          athlete_id?: string
+          coach_id?: string
+          created_at?: string
+          id?: string
+          text?: string
+          workout_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workout_feedback_workout_id_fkey"
+            columns: ["workout_id"]
+            isOneToOne: false
+            referencedRelation: "workouts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      workout_templates: {
+        Row: {
+          coach_id: string
+          created_at: string
+          id: string
+          name: string
+          notes: string | null
+          planned_duration_min: number | null
+          planned_tss: number | null
+          planned_zone: string | null
+          type: string
+        }
+        Insert: {
+          coach_id: string
+          created_at?: string
+          id?: string
+          name: string
+          notes?: string | null
+          planned_duration_min?: number | null
+          planned_tss?: number | null
+          planned_zone?: string | null
+          type: string
+        }
+        Update: {
+          coach_id?: string
+          created_at?: string
+          id?: string
+          name?: string
+          notes?: string | null
+          planned_duration_min?: number | null
+          planned_tss?: number | null
+          planned_zone?: string | null
+          type?: string
+        }
+        Relationships: []
       }
       workouts: {
         Row: {

@@ -22,7 +22,7 @@ const WorkoutSchema = z.object({
 const TodayDataSchema = z.object({
   hrv: z.number().min(-300).max(300),
   hrvStatus: z.string().max(20),
-  restingHr: z.number().min(20).max(250),
+  restingHr: z.number().min(0).max(250),
   sleepHours: z.number().min(0).max(24),
   sleepQuality: z.number().min(1).max(5),
   bodyBattery: z.number().min(0).max(100).optional().nullable(),

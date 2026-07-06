@@ -184,6 +184,9 @@ export default function CoachAthleteProfile() {
           />
         </div>
 
+        {/* Compliance */}
+        <ComplianceBadge variant="full" stats={computeCompliance(plans)} />
+
         {/* Alerts */}
         {latestCheck && (
           <Card>

@@ -286,20 +286,34 @@ export function getDailyTssEffective(date: string, workouts: Workout[]): number 
 }
 
 /**
- * Calculate Acute Training Load (ATL) - 7-day rolling average
- * TSS v2: Uses tssFinal directly, no HRV factor
+ * Calculate Acute Training Load (ATL) - 7-day exponential moving average
+ * Uses α = 2/(7+1) = 0.25 so rest days decay smoothly (no step-function drops
+ * when high-TSS days exit a fixed window). TSS v2: uses tssFinal directly.
+ * EMA is computed from the earliest workout date up to `date`, including rest
+ * days (TSS=0) so decay accumulates properly.
  */
 export function calculateATL(date: string, workouts: Workout[]): number {
+  if (workouts.length === 0) return 0;
+
   const targetDate = new Date(date);
-  let totalTss = 0;
-  
-  for (let i = 0; i < 7; i++) {
-    const checkDate = format(subDays(targetDate, i), 'yyyy-MM-dd');
-    const tss = getDailyTssEffective(checkDate, workouts);
-    totalTss += tss;
+  const alpha = 2 / (7 + 1); // 0.25
+
+  const sortedWorkoutDates = workouts.map(w => w.date).sort();
+  const startDate = new Date(sortedWorkoutDates[0]);
+
+  let atl = getDailyTssEffective(sortedWorkoutDates[0], workouts);
+
+  const daysDiff = Math.floor(
+    (targetDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24),
+  );
+
+  for (let i = 1; i <= daysDiff; i++) {
+    const currentDate = format(subDays(targetDate, daysDiff - i), 'yyyy-MM-dd');
+    const tss = getDailyTssEffective(currentDate, workouts);
+    atl = alpha * tss + (1 - alpha) * atl;
   }
-  
-  return Math.round(totalTss / 7);
+
+  return Math.round(atl * 10) / 10;
 }
 
 /**
@@ -331,7 +345,7 @@ export function calculateCTL(date: string, workouts: Workout[]): number {
     ctl = alpha * tss + (1 - alpha) * ctl;
   }
   
-  return Math.round(ctl);
+  return Math.round(ctl * 10) / 10;
 }
 
 export function getTodayMetrics(dailyChecks: DailyCheck[], workouts: Workout[]): TodayMetrics {
@@ -433,21 +447,49 @@ export interface DailyTrendData {
 }
 
 export function get14DayTrend(dailyChecks: DailyCheck[], workouts: Workout[]): DailyTrendData[] {
+  return getTrendData(14, dailyChecks, workouts);
+}
+
+/**
+ * Generalized trend data builder. Uses identical per-day calculations as
+ * get14DayTrend — only the temporal range varies. `days='all'` spans from the
+ * oldest available check-in or workout up to today.
+ */
+export function getTrendData(
+  days: number | 'all',
+  dailyChecks: DailyCheck[],
+  workouts: Workout[],
+): DailyTrendData[] {
   const today = new Date();
+  let span: number;
+
+  if (days === 'all') {
+    const allDates: string[] = [
+      ...dailyChecks.map(c => c.date),
+      ...workouts.map(w => w.date),
+    ].filter(Boolean);
+    if (allDates.length === 0) return [];
+    const oldest = allDates.sort()[0];
+    const [y, m, d] = oldest.split('-').map(Number);
+    const oldestDate = new Date(y, m - 1, d);
+    const diffMs = today.getTime() - oldestDate.getTime();
+    span = Math.max(1, Math.floor(diffMs / (1000 * 60 * 60 * 24)) + 1);
+  } else {
+    span = Math.max(1, days);
+  }
+
   const trend: DailyTrendData[] = [];
-  
-  for (let i = 13; i >= 0; i--) {
+  for (let i = span - 1; i >= 0; i--) {
     const targetDate = subDays(today, i);
     const dateStr = format(targetDate, 'yyyy-MM-dd');
     const displayDate = format(targetDate, 'dd/MM');
-    
+
     const check = dailyChecks.find(c => c.date === dateStr);
     const baseline = getHRVBaseline7d(dateStr, dailyChecks);
-    // TSS v2: CTL/ATL use tssFinal directly
     const ctl = calculateCTL(dateStr, workouts);
     const atl = calculateATL(dateStr, workouts);
     const tsb = ctl - atl;
-    
+
     trend.push({
       date: displayDate,
       fullDate: dateStr,
@@ -458,6 +500,7 @@ export function get14DayTrend(dailyChecks: DailyCheck[], workouts: Workout[]): D
       tsb,
     });
   }
-  
+
   return trend;
 }
+

@@ -1,10 +1,13 @@
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { MetricCard } from '@/components/ui/MetricCard';
 import { StatusBadge } from '@/components/ui/StatusBadge';
+import { LoadStatusCard } from '@/components/ui/LoadStatusCard';
 import { AICoach } from '@/components/AICoach';
-import { TrendCharts } from '@/components/TrendCharts';
+import { TrendCharts, TrendPeriod } from '@/components/TrendCharts';
+import { Button } from '@/components/ui/button';
 import { getTodayMetrics } from '@/lib/calculations';
+import { formatMetric } from '@/lib/formatMetric';
 import { useData } from '@/hooks/useData';
 import { useAlcoholIntake } from '@/hooks/useAlcoholIntake';
 import { useTrainingPlans } from '@/hooks/useTrainingPlans';
@@ -12,7 +15,20 @@ import { PlannedWorkoutCard } from '@/components/calendar/PlannedWorkoutCard';
 import { getAlcoholHRVCorrelation, getCorrelationColor, getCorrelationBgColor, getWeeklyPattern, getWeeklyPatternColor, getTrendArrow } from '@/lib/alcoholCalcs';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Heart, TrendingUp, TrendingDown, Activity, AlertTriangle, CheckCircle, PauseCircle, Loader2, Dumbbell, Wine } from 'lucide-react';
+import { Heart, TrendingUp, TrendingDown, Activity, AlertTriangle, CheckCircle, PauseCircle, Loader2, Dumbbell, Wine, Brain, ChevronRight } from 'lucide-react';
+import { Link } from 'react-router-dom';
+
+type PeriodKey = '14D' | '30D' | '90D' | '180D' | '1A' | 'Tudo';
+const PERIOD_OPTIONS: { key: PeriodKey; days: TrendPeriod; label: string }[] = [
+  { key: '14D', days: 14, label: '14 dias' },
+  { key: '30D', days: 30, label: '30 dias' },
+  { key: '90D', days: 90, label: '90 dias' },
+  { key: '180D', days: 180, label: '180 dias' },
+  { key: '1A', days: 365, label: '1 ano' },
+  { key: 'Tudo', days: 'all', label: 'Tudo' },
+];
+const STORAGE_KEY = 'dashboard_period_filter';
+
 
 const recommendationConfig = {
   maintain: {
@@ -50,6 +66,17 @@ export default function Today() {
     [alcoholEntries, dailyChecks]
   );
   const weeklyPattern = useMemo(() => getWeeklyPattern(alcoholEntries), [alcoholEntries]);
+
+  const [period, setPeriod] = useState<PeriodKey>(() => {
+    if (typeof window === 'undefined') return '14D';
+    const stored = window.localStorage.getItem(STORAGE_KEY) as PeriodKey | null;
+    return stored && PERIOD_OPTIONS.some(p => p.key === stored) ? stored : '14D';
+  });
+  useEffect(() => {
+    try { window.localStorage.setItem(STORAGE_KEY, period); } catch { /* ignore */ }
+  }, [period]);
+  const activePeriod = PERIOD_OPTIONS.find(p => p.key === period) ?? PERIOD_OPTIONS[0];
+
   
   if (isLoading) {
     return (
@@ -148,6 +175,26 @@ export default function Today() {
 
       {/* AI Coach Analysis */}
       <AICoach />
+
+      {/* Performance Coach access */}
+      <Link
+        to="/performance-coach"
+        className="flex items-center justify-between gradient-card rounded-xl p-5 border border-border/50 animate-slide-up hover:border-primary/40 transition-colors"
+      >
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+            <Brain className="w-5 h-5 text-primary" />
+          </div>
+          <div>
+            <p className="font-display font-semibold">Performance Coach</p>
+            <p className="text-xs text-muted-foreground">Análise integrada de todos os seus dados</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-1 text-sm text-primary font-medium">
+          Abrir
+          <ChevronRight className="w-4 h-4" />
+        </div>
+      </Link>
       
       {/* Alcohol Impact Card - only if sufficient data */}
       {correlation && (
@@ -184,23 +231,37 @@ export default function Today() {
       )}
 
       {/* Trend Charts */}
-      <TrendCharts />
+      {/* Period selector for charts */}
+      <div className="flex flex-wrap gap-2 animate-fade-in">
+        {PERIOD_OPTIONS.map(opt => (
+          <Button
+            key={opt.key}
+            variant={period === opt.key ? 'default' : 'secondary'}
+            size="sm"
+            onClick={() => setPeriod(opt.key)}
+          >
+            {opt.key}
+          </Button>
+        ))}
+      </div>
+
+      <TrendCharts period={activePeriod.days} periodLabel={activePeriod.label} />
       
       {/* Load Metrics */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <MetricCard
           label="CTL"
-          value={metrics.ctl}
+          value={formatMetric(metrics.ctl)}
           icon={<TrendingUp className="w-4 h-4" />}
         />
         <MetricCard
           label="ATL"
-          value={metrics.atl}
+          value={formatMetric(metrics.atl)}
           icon={<Activity className="w-4 h-4" />}
         />
         <MetricCard
           label="TSB"
-          value={metrics.tsb}
+          value={formatMetric(metrics.tsb)}
           valueClassName={
             metrics.tsb < -15 
               ? 'text-status-critical' 
@@ -209,6 +270,7 @@ export default function Today() {
                 : 'text-status-ok'
           }
         />
+        <LoadStatusCard tsb={metrics.tsb} />
       </div>
       
       {/* Active Model Banner */}

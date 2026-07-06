@@ -14,13 +14,16 @@ export interface StravaConnection {
 export interface StravaActivity {
   id: number;
   name: string;
-  type: 'Run' | 'Bike' | 'Strength';
+  type: 'Run' | 'Bike' | 'Strength' | 'Walk' | 'Hike' | 'other';
   stravaType: string;
+  sportType?: string | null;
   date: string;
   durationMin: number;
   distanceKm: number | null;
   avgHr: number | null;
+  maxHr?: number | null;
   hasHeartrate: boolean;
+  supported?: boolean;
 }
 
 export interface StravaActivityDetails extends StravaActivity {
