@@ -1,40 +1,21 @@
-## Objetivo
-Eliminar exibições com precisão excessiva (ex.: `3.199999999999999`) padronizando formatação numérica via helper compartilhado.
+## Plano
 
-## Causa raiz
-No `WeeklySummary.tsx` (Calendário), TSB é calculado inline como `ctl - atl` e renderizado direto (`{tsb}`), sem `toFixed`. CTL/ATL vêm de `calculations.ts` já arredondados para 1 casa, mas a subtração reintroduz o erro de ponto flutuante.
+Duas ações operacionais, sem alterar código funcional:
 
-## Mudanças
+### 1. Deploy da edge function `strava-webhook`
+- A função já existe em `supabase/functions/strava-webhook/index.ts` e está declarada em `supabase/config.toml` com `verify_jwt = false` (obrigatório para o Strava chamar o handshake e enviar eventos).
+- Publicar via `supabase--deploy_edge_functions` com `["strava-webhook"]`.
+- Após deploy, validar que `GET /functions/v1/strava-webhook` responde 200 (não mais 404), executando um `curl` simples.
 
-### 1. Criar helper compartilhado
-Novo arquivo `src/lib/formatMetric.ts`:
-```ts
-export function formatMetric(value: number | null | undefined, decimals = 1): string {
-  if (value == null || !Number.isFinite(value)) return "0.0";
-  return Number(value).toFixed(decimals);
-}
-```
+### 2. Aplicar a migration `20260706210000_athletes_update_own_training_plans.sql`
+- Conteúdo: cria a policy `Athletes can update their training plans` em `public.training_plans`, permitindo `UPDATE` quando `auth.uid() = athlete_id`.
+- Executar via `supabase--migration` com exatamente o mesmo SQL do arquivo (a policy será criada no banco).
+- Necessária para o botão "marcar como concluído" do atleta; o webhook usa service role e não depende dela.
 
-### 2. Corrigir Calendário (bug reportado)
-`src/components/calendar/WeeklySummary.tsx`:
-- Importar `formatMetric`.
-- Exibir CTL, ATL e TSB com `formatMetric(...)` (1 casa).
-- Manter lógica de status TSB (`getTsbStatus`) e ícone de tendência inalterados.
+### Fora de escopo
+- Nenhuma alteração em código, cálculos, TSS/CTL/ATL/TSB/PMC, Performance Coach, UI ou schema além da policy citada.
+- Não registrar assinatura do webhook no Strava (isso é passo separado do usuário via `?action=subscribe`).
 
-### 3. Varredura e padronização (escopo controlado)
-Aplicar `formatMetric` apenas onde há risco real de float drift ou inconsistência de casas decimais nos indicadores de carga/recuperação:
-
-- `src/pages/Today.tsx` — cards CTL/ATL/TSB (já usam `toFixed(1)`, trocar por `formatMetric` para consistência).
-- `src/components/ui/LoadStatusCard.tsx` — valor TSB exibido.
-- `src/components/TrendCharts.tsx` — tooltips/labels de CTL/ATL/TSB no PMC.
-- `src/components/calendar/DayMetricsCard.tsx` — se exibir HRV/métricas derivadas.
-
-### 4. Fora de escopo
-- Não alterar fórmulas (`calculateATL`, `calculateCTL`, TSS).
-- Não tocar em distância (`toFixed(1)` já consistente), duração (inteiros), Performance Coach, banco, edge functions, gráficos (eixos), ou PDFs.
-- TSS continua exibido como inteiro (`Math.round`), conforme padrão atual.
-
-## Validação
-- Abrir `/calendar` em semana com CTL=11.2 / ATL=8.0 → TSB deve mostrar `3.2`.
-- `bun run build` + `tsgo` limpos.
-- Screenshot Playwright do card "Resumo da Semana" confirmando os 3 valores com 1 casa decimal.
+### Validação pós-deploy
+- `curl` no endpoint público do webhook confirmando resposta 200.
+- Confirmar via `read_query` que a policy nova aparece em `pg_policies` para `training_plans`.
