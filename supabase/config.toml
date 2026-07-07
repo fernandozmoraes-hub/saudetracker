@@ -10,6 +10,14 @@ verify_jwt = false
 [functions.strava-webhook]
 verify_jwt = false
 
+# OAuth do WHOOP: o redirect do WHOOP chega sem JWT
+[functions.whoop-auth]
+verify_jwt = false
+
+# Webhook do WHOOP: público, validado por assinatura HMAC
+[functions.whoop-webhook]
+verify_jwt = false
+
 [functions.strava-import]
 verify_jwt = true
 

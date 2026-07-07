@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useUserSettings } from '@/hooks/useUserSettings';
 import { useStravaConnection } from '@/hooks/useStravaConnection';
+import { useWhoopConnection } from '@/hooks/useWhoopConnection';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { Heart, Save, Info, Loader2, Activity, Dumbbell, Zap, Link2, Unlink, CheckCircle2, Footprints, ChevronRight, Scale, Wine, UserCheck, LogOut } from 'lucide-react';
@@ -22,8 +23,10 @@ export default function Settings() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { settings, isLoading, updateSettings } = useUserSettings();
   const { connection, isLoading: isLoadingStrava, isConnecting, isConnected, connect, disconnect, handleCallback, handleOAuthCallback } = useStravaConnection();
+  const whoop = useWhoopConnection();
   const { invites, acceptInvite, rejectInvite } = usePendingInvites();
   const { signOut, user } = useAuth();
+  const [isDisconnectingWhoop, setIsDisconnectingWhoop] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
 
   const handleSignOut = async () => {
@@ -104,6 +107,40 @@ export default function Settings() {
         }
         setSearchParams({});
       });
+    }
+  }, [searchParams]);
+
+  // Handle WHOOP OAuth callback (tokens vêm na URL, mesma mecânica do Strava)
+  useEffect(() => {
+    const whoopSuccess = searchParams.get('whoop_success');
+    const whoopError = searchParams.get('whoop_error');
+
+    if (whoopSuccess === 'true') {
+      const whoopUserId = searchParams.get('whoop_user_id');
+      const accessToken = searchParams.get('whoop_access_token');
+      const refreshToken = searchParams.get('whoop_refresh_token');
+      const expiresIn = searchParams.get('whoop_expires_in');
+      const scope = searchParams.get('whoop_scope');
+
+      if (whoopUserId && accessToken && refreshToken && expiresIn) {
+        whoop.handleOAuthCallback({
+          whoopUserId,
+          accessToken,
+          refreshToken,
+          expiresIn,
+          scope: scope || '',
+        }).then((success) => {
+          if (success) {
+            toast({ title: 'Whoop conectado!', description: 'Seu check-in diário será preenchido automaticamente.' });
+          } else {
+            toast({ title: 'Erro ao salvar conexão Whoop', description: 'Tente novamente.', variant: 'destructive' });
+          }
+          setSearchParams({});
+        });
+      }
+    } else if (whoopError) {
+      toast({ title: 'Erro na conexão Whoop', description: `Erro: ${whoopError}`, variant: 'destructive' });
+      setSearchParams({});
     }
   }, [searchParams]);
 
@@ -190,6 +227,17 @@ export default function Settings() {
     setIsDisconnecting(false);
     if (success) {
       toast({ title: 'Strava desconectado' });
+    } else {
+      toast({ title: 'Erro ao desconectar', variant: 'destructive' });
+    }
+  };
+
+  const handleDisconnectWhoop = async () => {
+    setIsDisconnectingWhoop(true);
+    const success = await whoop.disconnect();
+    setIsDisconnectingWhoop(false);
+    if (success) {
+      toast({ title: 'Whoop desconectado' });
     } else {
       toast({ title: 'Erro ao desconectar', variant: 'destructive' });
     }
@@ -572,8 +620,63 @@ export default function Settings() {
         )}
       </div>
 
+      {/* Whoop Integration */}
+      <div className="gradient-card rounded-xl p-6 border border-border/50 space-y-4 animate-slide-up">
+        <div className="flex items-center gap-3">
+          <div className="p-2 rounded-lg bg-red-500/10">
+            <Heart className="w-5 h-5 text-red-500" />
+          </div>
+          <div className="flex-1">
+            <h3 className="font-display font-semibold">Integração Whoop</h3>
+            <p className="text-sm text-muted-foreground">
+              Check-in diário automático: HRV, FC repouso e sono
+            </p>
+          </div>
+          {whoop.isConnected && (
+            <span className="flex items-center gap-1 text-xs px-2 py-1 rounded-full bg-green-500/20 text-green-500">
+              <CheckCircle2 className="w-3 h-3" />
+              Conectado
+            </span>
+          )}
+        </div>
+
+        {whoop.isLoading ? (
+          <div className="flex items-center justify-center py-4">
+            <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+          </div>
+        ) : whoop.isConnected ? (
+          <div className="flex items-center justify-between p-3 rounded-lg bg-secondary border border-border">
+            <div>
+              <p className="font-medium">Whoop conectado</p>
+              <p className="text-sm text-muted-foreground">
+                HRV, FC de repouso, horas e qualidade do sono entram sozinhos no check-in toda manhã.
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleDisconnectWhoop}
+              disabled={isDisconnectingWhoop}
+            >
+              {isDisconnectingWhoop ? <Loader2 className="w-4 h-4 animate-spin" /> : <Unlink className="w-4 h-4 mr-1" />}
+              Desconectar
+            </Button>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Conecte sua conta Whoop para preencher o check-in diário automaticamente com HRV, frequência cardíaca de repouso e dados de sono.
+            </p>
+            <Button onClick={whoop.connect} disabled={whoop.isConnecting} className="w-full">
+              {whoop.isConnecting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Link2 className="w-4 h-4 mr-2" />}
+              Conectar com Whoop
+            </Button>
+          </div>
+        )}
+      </div>
+
       {/* Save Button */}
-      <Button 
+      <Button
         onClick={handleSave}
         disabled={isSaving || !hasChanges}
         className="w-full"
