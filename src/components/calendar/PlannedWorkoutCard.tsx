@@ -1,7 +1,11 @@
+import { useState } from 'react';
 import { isToday, isFuture } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { supabase } from '@/integrations/supabase/client';
 import { TrainingPlan } from '@/hooks/useTrainingPlans';
-import { CheckCircle2, XCircle, Clock, AlertCircle, ClipboardList } from 'lucide-react';
+import { CheckCircle2, XCircle, Clock, AlertCircle, ClipboardList, Loader2, Check } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { toast } from 'sonner';
 
 interface PlannedWorkoutCardProps {
   plan: TrainingPlan;
@@ -22,9 +26,9 @@ const typeColors: Record<string, string> = {
   recovery: 'bg-green-500/10 text-green-400 border-green-500/20',
 };
 
-function getPlanStatus(plan: TrainingPlan, date: Date): 'completed' | 'skipped' | 'upcoming' | 'missed' {
-  if (plan.status === 'completed') return 'completed';
-  if (plan.status === 'skipped') return 'skipped';
+function getPlanStatus(status: string, date: Date): 'completed' | 'skipped' | 'upcoming' | 'missed' {
+  if (status === 'completed') return 'completed';
+  if (status === 'skipped') return 'skipped';
   if (isFuture(date) || isToday(date)) return 'upcoming';
   return 'missed';
 }
@@ -37,10 +41,30 @@ const statusConfig = {
 };
 
 export function PlannedWorkoutCard({ plan, date }: PlannedWorkoutCardProps) {
-  const status = getPlanStatus(plan, date);
+  // Status local para refletir a conclusão manual sem recarregar a página
+  const [localStatus, setLocalStatus] = useState(plan.status);
+  const [isSaving, setIsSaving] = useState(false);
+
+  const status = getPlanStatus(localStatus, date);
   const cfg = statusConfig[status];
   const Icon = cfg.icon;
   const colorClass = typeColors[plan.type] ?? typeColors.endurance;
+
+  const handleComplete = async () => {
+    setIsSaving(true);
+    const { error } = await supabase
+      .from('training_plans')
+      .update({ status: 'completed' } as any)
+      .eq('id', plan.id);
+    setIsSaving(false);
+    if (error) {
+      console.error('Error completing plan:', error);
+      toast.error('Não foi possível marcar como concluído.');
+      return;
+    }
+    setLocalStatus('completed');
+    toast.success('Treino concluído! 💪');
+  };
 
   return (
     <div className={cn('rounded-lg border p-3 space-y-1.5', cfg.bg)}>
@@ -63,6 +87,20 @@ export function PlannedWorkoutCard({ plan, date }: PlannedWorkoutCardProps) {
       </div>
       {plan.notes && (
         <p className="text-xs text-muted-foreground pl-5 whitespace-pre-line">{plan.notes}</p>
+      )}
+      {(status === 'upcoming' || status === 'missed') && (
+        <div className="pl-5 pt-1">
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 text-xs text-green-500 border-green-500/30 hover:bg-green-500/10 hover:text-green-400"
+            onClick={handleComplete}
+            disabled={isSaving}
+          >
+            {isSaving ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Check className="w-3 h-3 mr-1" />}
+            Marcar como concluído
+          </Button>
+        </div>
       )}
     </div>
   );

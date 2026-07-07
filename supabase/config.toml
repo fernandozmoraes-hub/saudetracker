@@ -6,6 +6,10 @@ verify_jwt = true
 [functions.strava-auth]
 verify_jwt = false
 
+# Webhook do Strava: precisa ser público, o Strava não envia JWT
+[functions.strava-webhook]
+verify_jwt = false
+
 [functions.strava-import]
 verify_jwt = true
 
