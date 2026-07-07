@@ -463,6 +463,42 @@ export type Database = {
         }
         Relationships: []
       }
+      whoop_connections: {
+        Row: {
+          access_token: string
+          created_at: string | null
+          expires_at: string
+          id: string
+          refresh_token: string
+          scope: string | null
+          updated_at: string | null
+          user_id: string
+          whoop_user_id: number
+        }
+        Insert: {
+          access_token: string
+          created_at?: string | null
+          expires_at: string
+          id?: string
+          refresh_token: string
+          scope?: string | null
+          updated_at?: string | null
+          user_id: string
+          whoop_user_id: number
+        }
+        Update: {
+          access_token?: string
+          created_at?: string | null
+          expires_at?: string
+          id?: string
+          refresh_token?: string
+          scope?: string | null
+          updated_at?: string | null
+          user_id?: string
+          whoop_user_id?: number
+        }
+        Relationships: []
+      }
       workout_evaluations: {
         Row: {
           created_at: string
