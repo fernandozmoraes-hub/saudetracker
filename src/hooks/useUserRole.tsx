@@ -18,24 +18,30 @@ const UserRoleContext = createContext<UserRoleContextType | undefined>(undefined
 export function UserRoleProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const [role, setRoleState] = useState<AppRole | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  // Guarda para qual user_id o papel já foi buscado. Num reload completo o
+  // user chega depois do primeiro render; sem isso, o ProtectedRoute decide
+  // com papel vazio antes da busca terminar e redireciona para /select-role.
+  const [fetchedForUserId, setFetchedForUserId] = useState<string | null>(null);
 
   const fetchRole = useCallback(async () => {
     if (!user) {
       setRoleState(null);
-      setIsLoading(false);
+      setFetchedForUserId(null);
       return;
     }
 
     try {
+      // maybeSingle + order: não quebra se o usuário tiver mais de um papel
+      // (registro duplicado); o papel de atleta tem precedência
       const { data, error } = await supabase
         .from('user_roles')
         .select('role')
         .eq('user_id', user.id)
+        .order('role', { ascending: true })
         .limit(1)
-        .single();
+        .maybeSingle();
 
-      if (error && error.code !== 'PGRST116') {
+      if (error) {
         console.error('Error fetching role:', error);
       }
 
@@ -43,13 +49,16 @@ export function UserRoleProvider({ children }: { children: ReactNode }) {
     } catch (err) {
       console.error('Error fetching role:', err);
     } finally {
-      setIsLoading(false);
+      setFetchedForUserId(user.id);
     }
   }, [user]);
 
   useEffect(() => {
     fetchRole();
   }, [fetchRole]);
+
+  // Carregando enquanto a busca do papel do usuário atual não terminou
+  const isLoading = !!user && fetchedForUserId !== user.id;
 
   const setRole = async (newRole: AppRole): Promise<boolean> => {
     if (!user) return false;

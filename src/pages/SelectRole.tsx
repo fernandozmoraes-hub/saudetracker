@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useAuth } from '@/hooks/useAuth';
@@ -9,12 +9,27 @@ import { Users, Dumbbell, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function SelectRole() {
-  const { setRole } = useUserRole();
+  const { setRole, role, hasRole, isLoading } = useUserRole();
   const { user } = useAuth();
   const navigate = useNavigate();
   const [saving, setSaving] = useState(false);
 
+  // Quem já tem papel definido não deve ficar nesta tela
+  useEffect(() => {
+    if (!isLoading && hasRole && !saving) {
+      navigate(role === 'coach' ? '/coach' : '/', { replace: true });
+    }
+  }, [isLoading, hasRole, role, saving, navigate]);
+
   if (!user) return null;
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   const handleSelect = async (role: 'coach' | 'athlete') => {
     setSaving(true);
