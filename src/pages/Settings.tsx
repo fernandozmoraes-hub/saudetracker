@@ -632,10 +632,15 @@ export default function Settings() {
               Check-in diário automático: HRV, FC repouso e sono
             </p>
           </div>
-          {whoop.isConnected && (
+          {whoop.isConnected && !whoop.connection?.needs_reauth && (
             <span className="flex items-center gap-1 text-xs px-2 py-1 rounded-full bg-green-500/20 text-green-500">
               <CheckCircle2 className="w-3 h-3" />
               Conectado
+            </span>
+          )}
+          {whoop.isConnected && whoop.connection?.needs_reauth && (
+            <span className="flex items-center gap-1 text-xs px-2 py-1 rounded-full bg-orange-500/20 text-orange-500">
+              Reconexão necessária
             </span>
           )}
         </div>
@@ -643,6 +648,26 @@ export default function Settings() {
         {whoop.isLoading ? (
           <div className="flex items-center justify-center py-4">
             <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+          </div>
+        ) : whoop.isConnected && whoop.connection?.needs_reauth ? (
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              A autorização da Whoop expirou e o check-in parou de ser preenchido automaticamente. Reconecte para retomar.
+            </p>
+            <div className="flex gap-2">
+              <Button onClick={whoop.connect} disabled={whoop.isConnecting} className="flex-1">
+                {whoop.isConnecting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Link2 className="w-4 h-4 mr-2" />}
+                Reconectar
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleDisconnectWhoop}
+                disabled={isDisconnectingWhoop}
+              >
+                {isDisconnectingWhoop ? <Loader2 className="w-4 h-4 animate-spin" /> : <Unlink className="w-4 h-4" />}
+              </Button>
+            </div>
           </div>
         ) : whoop.isConnected ? (
           <div className="flex items-center justify-between p-3 rounded-lg bg-secondary border border-border">
