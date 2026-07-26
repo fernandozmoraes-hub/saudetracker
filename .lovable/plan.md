@@ -1,24 +1,35 @@
 ## Objetivo
-Executar a exclusão do registro `user_roles` com ID `fb79946f-c2be-4307-a921-34b600ed1f9d`, removendo assim o papel `coach` do usuário `b0683d0d-be61-4bbf-869e-e7ff24dc6cf5`.
+Incluir dois novos tipos de exercício monitorados: **Ioga** e **Caminhada**.
 
-## Contexto
-Consulta anterior confirmou que o usuário possui dois papéis:
-- `athlete` (ID `fd2042e9-aacc-4311-bc3f-1bf7ea78722a`)
-- `coach` (ID `fb79946f-c2be-4307-a921-34b600ed1f9d`)
+## Comportamento definido
+- **Caminhada**: sessão de endurance — permite distância, FC média e tempo por zonas; TSS por FC/zonas (mesma lógica de Corrida/Bike), com fallback para RPE.
+- **Ioga**: sessão leve — TSS apenas por RPE × duração (categoria "legacy"), sem campos de distância/FC.
 
-A exclusão afeta apenas o papel `coach`; o papel `athlete` permanece inalterado.
+## Mudanças
 
-## Ação
-```sql
-DELETE FROM user_roles WHERE id = 'fb79946f-c2be-4307-a921-34b600ed1f9d';
-```
+### 1. Banco de dados (migração)
+- Atualizar o check de `workouts.type` para aceitar também `Walk` e `Yoga` (mantendo `Run`, `Strength`, `Bike`, `Rest`).
+- Nenhuma alteração em `session_type` (os valores existentes já cobrem os dois casos).
 
-## Verificação
-Após a execução, confirmar que o usuário possui apenas o papel `athlete`:
-```sql
-SELECT * FROM user_roles WHERE user_id = 'b0683d0d-be61-4bbf-869e-e7ff24dc6cf5';
-```
+### 2. Tipos
+- `src/types/health.ts`: `WorkoutType` passa a incluir `'Walk' | 'Yoga'`.
 
-## Impacto
-- O usuário deixa de ter permissões de coach no sistema.
-- Relacionamentos em `coach_athletes` não são removidos automaticamente por este comando; se desejado, podemos limpar vínculos ativos de coach em seguida.
+### 3. Cálculo de carga
+- `src/lib/calculations.ts` → `getSessionType`: `Walk` retorna `endurance`; `Yoga` cai no padrão `legacy` (RPE).
+- Nenhuma alteração nas fórmulas de TSS, CTL, ATL, TSB ou PMC.
+
+### 4. Tela de registro (`src/pages/Workout.tsx`)
+- Adicionar botões "Caminhada" (ícone Footprints) e "Ioga" (ícone de alongamento/PersonStanding) na lista de tipos.
+- Estender as condições que hoje testam `Run || Bike` para incluir `Walk`, de modo que distância, FC e zonas apareçam na caminhada.
+- Ioga mostra apenas duração + RPE.
+- Seleção de tênis (equipamento) passa a valer para `Run` e `Walk`.
+
+### 5. Exibição
+- Rótulos e ícones dos novos tipos no histórico da própria página de treino, no calendário e no detalhe do treino, para que não apareçam sem nome.
+- `StravaImportModal`: mapear atividades `Walk`/`Hike` do Strava para o tipo Caminhada e `Yoga` para Ioga.
+
+### 6. Prescrição de treino (opcional, incluído)
+- Acrescentar "Caminhada" e "Ioga" às opções de tipo em `PrescribeWorkout.tsx` para o coach poder prescrevê-los.
+
+## Fora do escopo
+Nenhuma mudança em Performance Coach, composição corporal, álcool ou nas fórmulas de carga.
