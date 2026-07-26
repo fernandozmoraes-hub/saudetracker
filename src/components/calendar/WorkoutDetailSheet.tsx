@@ -24,7 +24,7 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
-import { Footprints, Dumbbell, Bike, Bed, Timer, MapPin, Heart, Activity, Zap, Pencil, Trash2 } from 'lucide-react';
+import { Footprints, Dumbbell, Bike, Bed, Timer, MapPin, Heart, Activity, Zap, Pencil, Trash2, PersonStanding, Flower2 } from 'lucide-react';
 
 interface WorkoutDetailSheetProps {
   workout: Workout | null;
@@ -37,6 +37,8 @@ const workoutIcons = {
   Strength: Dumbbell,
   Bike: Bike,
   Rest: Bed,
+  Walk: PersonStanding,
+  Yoga: Flower2,
 };
 
 const workoutLabels = {
@@ -44,6 +46,8 @@ const workoutLabels = {
   Strength: 'Musculação',
   Bike: 'Bike',
   Rest: 'Descanso',
+  Walk: 'Caminhada',
+  Yoga: 'Ioga',
 };
 
 const getTssMethodLabel = (method?: TssMethod): string => {

@@ -10,7 +10,7 @@ export interface DailyCheck {
   alcoholYesterday?: boolean;
 }
 
-export type WorkoutType = 'Run' | 'Strength' | 'Bike' | 'Rest';
+export type WorkoutType = 'Run' | 'Strength' | 'Bike' | 'Rest' | 'Walk' | 'Yoga';
 
 // Novos tipos para modelo híbrido TSS v2
 export type SessionType = 'endurance' | 'strength' | 'legacy';

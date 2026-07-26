@@ -14,7 +14,7 @@ export interface StravaConnection {
 export interface StravaActivity {
   id: number;
   name: string;
-  type: 'Run' | 'Bike' | 'Strength' | 'Walk' | 'Hike' | 'other';
+  type: 'Run' | 'Bike' | 'Strength' | 'Walk' | 'Hike' | 'Yoga' | 'other';
   stravaType: string;
   sportType?: string | null;
   date: string;

@@ -1,6 +1,6 @@
 import { Workout, TssMethod } from '@/types/health';
 import { cn } from '@/lib/utils';
-import { Footprints, Dumbbell, Bike, Bed } from 'lucide-react';
+import { Footprints, Dumbbell, Bike, Bed, PersonStanding, Flower2 } from 'lucide-react';
 
 interface DayWorkoutCardProps {
   workout: Workout;
@@ -12,6 +12,8 @@ const workoutIcons = {
   Strength: Dumbbell,
   Bike: Bike,
   Rest: Bed,
+  Walk: PersonStanding,
+  Yoga: Flower2,
 };
 
 const workoutColors = {
@@ -19,6 +21,8 @@ const workoutColors = {
   Strength: 'bg-orange-500/10 text-orange-500 border-orange-500/20',
   Bike: 'bg-green-500/10 text-green-500 border-green-500/20',
   Rest: 'bg-muted text-muted-foreground border-border',
+  Walk: 'bg-teal-500/10 text-teal-500 border-teal-500/20',
+  Yoga: 'bg-purple-500/10 text-purple-500 border-purple-500/20',
 };
 
 const getTssMethodLabel = (method?: TssMethod): string => {

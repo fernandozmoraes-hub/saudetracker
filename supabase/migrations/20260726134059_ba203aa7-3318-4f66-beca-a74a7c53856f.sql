@@ -1,0 +1,2 @@
+ALTER TABLE public.workouts DROP CONSTRAINT IF EXISTS workouts_type_check;
+ALTER TABLE public.workouts ADD CONSTRAINT workouts_type_check CHECK (type = ANY (ARRAY['Run'::text, 'Strength'::text, 'Bike'::text, 'Rest'::text, 'Walk'::text, 'Yoga'::text]));

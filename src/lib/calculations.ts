@@ -122,6 +122,7 @@ export function getSessionType(workoutType: string): SessionType {
   switch (workoutType) {
     case 'Run':
     case 'Bike':
+    case 'Walk':
       return 'endurance';
     case 'Strength':
       return 'strength';

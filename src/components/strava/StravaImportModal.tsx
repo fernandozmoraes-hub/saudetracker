@@ -17,7 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Loader2, Activity, Bike, Timer, Heart, MapPin, Zap, Check, ChevronRight, Footprints } from 'lucide-react';
+import { Loader2, Activity, Bike, Timer, Heart, MapPin, Zap, Check, ChevronRight, Footprints, PersonStanding, Flower2 } from 'lucide-react';
 import { useStravaConnection } from '@/hooks/useStravaConnection';
 import { useEquipment, calculateWearPercentage, getStatusColorClasses } from '@/hooks/useEquipment';
 import { StravaActivity, StravaActivityDetails } from '@/types/strava';
@@ -92,6 +92,9 @@ export function StravaImportModal({ open, onOpenChange, onImport }: StravaImport
     switch (type) {
       case 'Run': return <Activity className="w-5 h-5" />;
       case 'Bike': return <Bike className="w-5 h-5" />;
+      case 'Walk':
+      case 'Hike': return <PersonStanding className="w-5 h-5" />;
+      case 'Yoga': return <Flower2 className="w-5 h-5" />;
       default: return <Timer className="w-5 h-5" />;
     }
   };
@@ -101,6 +104,9 @@ export function StravaImportModal({ open, onOpenChange, onImport }: StravaImport
       case 'Run': return 'Corrida';
       case 'Bike': return 'Bike';
       case 'Strength': return 'Força';
+      case 'Walk':
+      case 'Hike': return 'Caminhada';
+      case 'Yoga': return 'Ioga';
       default: return type;
     }
   };
@@ -245,7 +251,7 @@ export function StravaImportModal({ open, onOpenChange, onImport }: StravaImport
             )}
 
             {/* Equipment Selection for Run */}
-            {selectedActivity.type === 'Run' && (
+            {(selectedActivity.type === 'Run' || selectedActivity.type === 'Walk' || selectedActivity.type === 'Hike') && (
               <div className="space-y-2">
                 <Label className="flex items-center gap-2">
                   <Footprints className="w-4 h-4 text-primary" />
