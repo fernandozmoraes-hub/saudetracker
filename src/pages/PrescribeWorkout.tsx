@@ -22,6 +22,8 @@ const TYPE_LABELS: Record<string, string> = {
   strength: 'Força',
   hiit: 'HIIT',
   recovery: 'Recuperação',
+  walk: 'Caminhada',
+  yoga: 'Ioga',
 };
 
 const TYPE_COLORS: Record<string, string> = {
@@ -29,6 +31,8 @@ const TYPE_COLORS: Record<string, string> = {
   strength: 'bg-orange-500/10 text-orange-400 border-orange-500/20',
   hiit: 'bg-red-500/10 text-red-400 border-red-500/20',
   recovery: 'bg-green-500/10 text-green-400 border-green-500/20',
+  walk: 'bg-teal-500/10 text-teal-400 border-teal-500/20',
+  yoga: 'bg-purple-500/10 text-purple-400 border-purple-500/20',
 };
 
 interface FormState {
@@ -291,6 +295,8 @@ export default function PrescribeWorkout() {
                   <SelectItem value="strength">Força</SelectItem>
                   <SelectItem value="hiit">HIIT</SelectItem>
                   <SelectItem value="recovery">Recuperação</SelectItem>
+                  <SelectItem value="walk">Caminhada</SelectItem>
+                  <SelectItem value="yoga">Ioga</SelectItem>
                 </SelectContent>
               </Select>
             </div>

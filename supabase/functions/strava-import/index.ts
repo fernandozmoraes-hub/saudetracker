@@ -25,7 +25,8 @@ const ACTIVITY_TYPE_MAP: Record<string, string> = {
   WeightTraining: 'Strength',
   Workout: 'Strength',
   Walk: 'Walk',
-  Hike: 'Hike',
+  Hike: 'Walk',
+  Yoga: 'Yoga',
 };
 
 // Pagination safety cap

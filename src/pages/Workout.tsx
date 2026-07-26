@@ -26,13 +26,15 @@ import { StravaActivityDetails } from '@/types/strava';
 import { useStravaConnection } from '@/hooks/useStravaConnection';
 import { StravaImportModal } from '@/components/strava/StravaImportModal';
 import { useToast } from '@/hooks/use-toast';
-import { Dumbbell, Bike, Timer, Activity, Check, MapPin, Heart, CalendarIcon, Settings, Info, Zap, Download, Pencil, Footprints } from 'lucide-react';
+import { Dumbbell, Bike, Timer, Activity, Check, MapPin, Heart, CalendarIcon, Settings, Info, Zap, Download, Pencil, Footprints, PersonStanding, Flower2 } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 
 const workoutTypes: { type: WorkoutTypeEnum; label: string; icon: React.ReactNode }[] = [
   { type: 'Run', label: 'Corrida', icon: <Activity className="w-5 h-5" /> },
   { type: 'Strength', label: 'Musculação', icon: <Dumbbell className="w-5 h-5" /> },
   { type: 'Bike', label: 'Bike', icon: <Bike className="w-5 h-5" /> },
+  { type: 'Walk', label: 'Caminhada', icon: <PersonStanding className="w-5 h-5" /> },
+  { type: 'Yoga', label: 'Ioga', icon: <Flower2 className="w-5 h-5" /> },
   { type: 'Rest', label: 'Descanso', icon: <Timer className="w-5 h-5" /> },
 ];
 
@@ -220,8 +222,8 @@ export default function Workout() {
       tssSubjective: selectedType === 'Rest' ? 0 : tssSubjective,
       tssFinal: tssCalc.tssFinal,
       validated: selectedType === 'Strength' ? validated : true,
-      distanceKm: (selectedType === 'Run' || selectedType === 'Bike') ? distance : undefined,
-      avgHr: (selectedType === 'Run' || selectedType === 'Bike') ? avgHr : undefined,
+      distanceKm: (selectedType === 'Run' || selectedType === 'Bike' || selectedType === 'Walk') ? distance : undefined,
+      avgHr: (selectedType === 'Run' || selectedType === 'Bike' || selectedType === 'Walk') ? avgHr : undefined,
       lthrUsed: tssCalc.lthrUsed,
       muscleGroups: selectedType === 'Strength' && muscleGroups.length > 0 ? muscleGroups : undefined,
       // HR Zone times
@@ -232,7 +234,7 @@ export default function Workout() {
       timeZ5Min: zoneTimes?.timeZ5Min,
       tssMethod: tssCalc.tssMethod,
       // Equipment
-      equipmentId: selectedType === 'Run' ? selectedEquipmentId : undefined,
+      equipmentId: (selectedType === 'Run' || selectedType === 'Walk') ? selectedEquipmentId : undefined,
     };
     
     const success = await saveWorkout(workout);
@@ -282,7 +284,11 @@ export default function Workout() {
     // Parse date in local timezone to avoid UTC offset issues
     const [year, month, day] = activity.date.split('-').map(Number);
     setSelectedDate(new Date(year, month - 1, day));
-    setSelectedType(activity.type as WorkoutTypeEnum);
+    const importedType: WorkoutTypeEnum =
+      activity.type === 'Hike' ? 'Walk'
+      : (['Run', 'Bike', 'Strength', 'Walk', 'Yoga'] as string[]).includes(activity.type) ? (activity.type as WorkoutTypeEnum)
+      : 'Run';
+    setSelectedType(importedType);
     setDuration(activity.durationMin);
     setDistance(activity.distanceKm || undefined);
     setAvgHr(activity.avgHr || undefined);
@@ -344,8 +350,8 @@ export default function Workout() {
                 <div className="text-right text-muted-foreground">
                   <span>
                     {w.durationMin}min
-                    {(w.type === 'Run' || w.type === 'Bike') && w.distanceKm && ` • ${w.distanceKm}km`}
-                    {(w.type === 'Run' || w.type === 'Bike') && w.avgHr && ` • FC ${w.avgHr}`}
+                    {(w.type === 'Run' || w.type === 'Bike' || w.type === 'Walk') && w.distanceKm && ` • ${w.distanceKm}km`}
+                    {(w.type === 'Run' || w.type === 'Bike' || w.type === 'Walk') && w.avgHr && ` • FC ${w.avgHr}`}
                     {w.type === 'Strength' && w.muscleGroups && w.muscleGroups.length > 0 && ` • ${w.muscleGroups.map(getMuscleGroupLabel).join(', ')}`}
                   </span>
                   <div className="flex items-center justify-end gap-1.5 mt-0.5">
@@ -422,7 +428,7 @@ export default function Workout() {
               />
             </div>
             
-            {(selectedType === 'Run' || selectedType === 'Bike') && (
+            {(selectedType === 'Run' || selectedType === 'Bike' || selectedType === 'Walk') && (
               <>
                 <div className="grid grid-cols-2 gap-4 animate-slide-up">
                   <div className="space-y-2">
@@ -457,7 +463,7 @@ export default function Workout() {
                 </div>
 
                 {/* Equipment Selection for Run */}
-                {selectedType === 'Run' && (
+                {(selectedType === 'Run' || selectedType === 'Walk') && (
                   <div className="space-y-2 animate-slide-up">
                     <Label className="flex items-center gap-2">
                       <Footprints className="w-4 h-4 text-primary" />
