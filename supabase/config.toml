@@ -23,3 +23,8 @@ verify_jwt = true
 
 [functions.workout-evaluator]
 verify_jwt = true
+
+# Sincronização semanal do plano de treino: chamada pela rotina agendada (Claude),
+# não pelo usuário logado. Protegida por segredo compartilhado (X-Sync-Secret), não por JWT.
+[functions.weekly-plan-sync]
+verify_jwt = false
