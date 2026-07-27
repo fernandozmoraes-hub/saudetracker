@@ -6,6 +6,7 @@ export interface WhoopConnection {
   refresh_token: string;
   expires_at: string;
   scope: string | null;
+  needs_reauth: boolean;
   created_at: string;
   updated_at: string;
 }

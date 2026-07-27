@@ -147,6 +147,7 @@ serve(async (req) => {
           refresh_token: body.refreshToken,
           expires_at: expiresAt,
           scope: body.scope,
+          needs_reauth: false,
           updated_at: new Date().toISOString(),
         }, { onConflict: 'user_id' });
 
