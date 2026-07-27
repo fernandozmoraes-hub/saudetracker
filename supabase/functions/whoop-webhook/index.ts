@@ -46,7 +46,28 @@ async function refreshTokenIfNeeded(supabase: any, connection: any): Promise<str
         scope: 'offline',
       }),
     });
-    if (!response.ok) throw new Error(`whoop_refresh_failed status=${response.status}`);
+    if (!response.ok) {
+      // WHOOP envia recovery.updated e sleep.updated quase juntos para o mesmo evento,
+      // então duas invocações deste webhook podem tentar renovar o mesmo refresh_token em
+      // paralelo. Como o refresh_token é de uso único, quem perder a corrida recebe 400
+      // mesmo a renovação tendo funcionado no outro lado. Antes de desistir, confere se a
+      // conexão já foi atualizada por essa outra invocação.
+      const { data: latest } = await supabase
+        .from('whoop_connections')
+        .select('access_token, expires_at')
+        .eq('id', connection.id)
+        .maybeSingle();
+      if (latest && new Date(latest.expires_at).getTime() - Date.now() >= 5 * 60 * 1000) {
+        return latest.access_token;
+      }
+      // Falha real: o refresh_token não é mais válido (revogado/expirado). Marca a conexão
+      // para o Settings parar de mostrar "conectado" e o usuário precisar reautorizar.
+      await supabase
+        .from('whoop_connections')
+        .update({ needs_reauth: true, updated_at: new Date().toISOString() })
+        .eq('id', connection.id);
+      throw new Error(`whoop_refresh_failed status=${response.status}`);
+    }
     const tokenData = await response.json();
     await supabase
       .from('whoop_connections')
@@ -54,6 +75,7 @@ async function refreshTokenIfNeeded(supabase: any, connection: any): Promise<str
         access_token: tokenData.access_token,
         refresh_token: tokenData.refresh_token,
         expires_at: new Date(Date.now() + Number(tokenData.expires_in) * 1000).toISOString(),
+        needs_reauth: false,
         updated_at: new Date().toISOString(),
       })
       .eq('id', connection.id);

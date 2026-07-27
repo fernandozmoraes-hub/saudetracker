@@ -469,6 +469,7 @@ export type Database = {
           created_at: string | null
           expires_at: string
           id: string
+          needs_reauth: boolean
           refresh_token: string
           scope: string | null
           updated_at: string | null
@@ -480,6 +481,7 @@ export type Database = {
           created_at?: string | null
           expires_at: string
           id?: string
+          needs_reauth?: boolean
           refresh_token: string
           scope?: string | null
           updated_at?: string | null
@@ -491,6 +493,7 @@ export type Database = {
           created_at?: string | null
           expires_at?: string
           id?: string
+          needs_reauth?: boolean
           refresh_token?: string
           scope?: string | null
           updated_at?: string | null
