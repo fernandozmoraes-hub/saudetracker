@@ -148,6 +148,7 @@ serve(async (req) => {
           expires_at: expiresAt,
           scope: body.scope,
           needs_reauth: false,
+          refresh_claimed_at: null,
           updated_at: new Date().toISOString(),
         }, { onConflict: 'user_id' });
 
