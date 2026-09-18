@@ -32,39 +32,79 @@ async function isValidSignature(req: Request, rawBody: string): Promise<boolean>
   return expected === signature;
 }
 
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+const CLAIM_STALE_MS = 30_000; // se uma invocação morrer com o claim preso, libera depois disso
+const CLAIM_WAIT_ATTEMPTS = 8;
+const CLAIM_WAIT_INTERVAL_MS = 500;
+
+/**
+ * Renova o access_token se necessário. A WHOOP envia recovery.updated e sleep.updated quase
+ * juntos para o mesmo evento, disparando duas invocações concorrentes deste webhook. Como o
+ * refresh_token é de uso único, duas chamadas simultâneas à WHOOP com o mesmo refresh_token
+ * fazem AMBAS falharem com 400 (a WHOOP invalida o token inteiro ao detectar reuso
+ * concorrente) — não existe "vencedor" pra uma reconferência posterior detectar. Por isso,
+ * antes de chamar a WHOOP, cada invocação tenta reivindicar o direito exclusivo de renovar
+ * via um UPDATE condicional atômico (só uma consegue). Quem não conseguir espera a vencedora
+ * terminar e reusa o token que ela renovou, em vez de chamar a WHOOP também.
+ */
 async function refreshTokenIfNeeded(supabase: any, connection: any): Promise<string> {
   const expiresAt = new Date(connection.expires_at);
-  if (expiresAt.getTime() - Date.now() < 5 * 60 * 1000) {
+  if (expiresAt.getTime() - Date.now() >= 5 * 60 * 1000) {
+    return connection.access_token;
+  }
+
+  const now = new Date();
+  const staleBefore = new Date(now.getTime() - CLAIM_STALE_MS).toISOString();
+  const soon = new Date(now.getTime() + 5 * 60 * 1000).toISOString();
+
+  const { data: claimed } = await supabase
+    .from('whoop_connections')
+    .update({ refresh_claimed_at: now.toISOString() })
+    .eq('id', connection.id)
+    .lt('expires_at', soon)
+    .or(`refresh_claimed_at.is.null,refresh_claimed_at.lt.${staleBefore}`)
+    .select('refresh_token')
+    .maybeSingle();
+
+  if (!claimed) {
+    // Outra invocação já está renovando (ou já terminou) — espera e reusa o resultado dela
+    // em vez de arriscar uma segunda chamada concorrente à WHOOP.
+    for (let i = 0; i < CLAIM_WAIT_ATTEMPTS; i++) {
+      const { data: fresh } = await supabase
+        .from('whoop_connections')
+        .select('access_token, expires_at')
+        .eq('id', connection.id)
+        .maybeSingle();
+      if (fresh && new Date(fresh.expires_at).getTime() - Date.now() >= 5 * 60 * 1000) {
+        return fresh.access_token;
+      }
+      await sleep(CLAIM_WAIT_INTERVAL_MS);
+    }
+    throw new Error('whoop_refresh_wait_timeout');
+  }
+
+  try {
     const response = await fetch(WHOOP_TOKEN_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
         grant_type: 'refresh_token',
-        refresh_token: connection.refresh_token,
+        refresh_token: claimed.refresh_token,
         client_id: WHOOP_CLIENT_ID!,
         client_secret: WHOOP_CLIENT_SECRET!,
         scope: 'offline',
       }),
     });
     if (!response.ok) {
-      // WHOOP envia recovery.updated e sleep.updated quase juntos para o mesmo evento,
-      // então duas invocações deste webhook podem tentar renovar o mesmo refresh_token em
-      // paralelo. Como o refresh_token é de uso único, quem perder a corrida recebe 400
-      // mesmo a renovação tendo funcionado no outro lado. Antes de desistir, confere se a
-      // conexão já foi atualizada por essa outra invocação.
-      const { data: latest } = await supabase
-        .from('whoop_connections')
-        .select('access_token, expires_at')
-        .eq('id', connection.id)
-        .maybeSingle();
-      if (latest && new Date(latest.expires_at).getTime() - Date.now() >= 5 * 60 * 1000) {
-        return latest.access_token;
-      }
-      // Falha real: o refresh_token não é mais válido (revogado/expirado). Marca a conexão
-      // para o Settings parar de mostrar "conectado" e o usuário precisar reautorizar.
+      // Falha real (não é corrida — só esta invocação tinha o direito de renovar): o
+      // refresh_token não é mais válido. Marca a conexão pro Settings parar de mostrar
+      // "conectado" e o usuário precisar reautorizar.
       await supabase
         .from('whoop_connections')
-        .update({ needs_reauth: true, updated_at: new Date().toISOString() })
+        .update({ needs_reauth: true, refresh_claimed_at: null, updated_at: new Date().toISOString() })
         .eq('id', connection.id);
       throw new Error(`whoop_refresh_failed status=${response.status}`);
     }
@@ -76,12 +116,19 @@ async function refreshTokenIfNeeded(supabase: any, connection: any): Promise<str
         refresh_token: tokenData.refresh_token,
         expires_at: new Date(Date.now() + Number(tokenData.expires_in) * 1000).toISOString(),
         needs_reauth: false,
+        refresh_claimed_at: null,
         updated_at: new Date().toISOString(),
       })
       .eq('id', connection.id);
     return tokenData.access_token;
+  } catch (err) {
+    // Garante que o claim não fique preso até CLAIM_STALE_MS em erros inesperados (rede, etc.)
+    await supabase
+      .from('whoop_connections')
+      .update({ refresh_claimed_at: null })
+      .eq('id', connection.id);
+    throw err;
   }
-  return connection.access_token;
 }
 
 /** Converte sleep_performance_percentage (0-100) para a escala 1-5 do app */
